@@ -1,13 +1,14 @@
-"""Build exact historical BLS CPI and Employment Situation release timestamps.
+"""Build historical BLS CPI and Employment Situation release timestamps.
 
-V0.4A uses the official annual BLS release calendars instead of downloading every
-archived news-release page. Each calendar row contains the release date, exact
-minute, release name, and reference period; BLS states that calendar times are
-Eastern Time. America/New_York converts those local timestamps to UTC with
-historical daylight-saving rules.
+Primary source: official annual BLS release calendars. If BLS blocks automated
+calendar access with HTTP 403, V0.4A falls back to a dual-official-source
+reconstruction using the first non-bootstrap ALFRED vintage date already stored
+locally by V0.3 plus the documented 08:30 America/New_York release time used for
+CPI and Employment Situation. The fallback is explicitly labeled in provenance
+and cross-checks CPI against Core CPI and Payroll against Unemployment dates.
 
-This design is intentionally low-volume: normally one official schedule page per
-year. It does not fabricate actual values or consensus forecasts.
+No browser impersonation, proxy bypass, fabricated actual values, or fabricated
+consensus forecasts are used.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import re
 import time
 from datetime import datetime
 from html.parser import HTMLParser
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -30,7 +32,7 @@ try:
         http_session,
         normalize_event_schema,
     )
-except ImportError:  # Support direct execution: python src/events/download_bls_release_calendar.py
+except ImportError:  # Support direct execution.
     from common import (
         DATA_DIRECTORY,
         QUARANTINE_DIRECTORY,
@@ -40,21 +42,30 @@ except ImportError:  # Support direct execution: python src/events/download_bls_
     )
 
 
+ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_FILE = DATA_DIRECTORY / "bls_release_events.parquet"
 QUARANTINE_FILE = QUARANTINE_DIRECTORY / "bls_release_events_unusable.parquet"
+FRED_MACRO_FILE = ROOT / "data" / "macro" / "fred_macro.parquet"
 NEW_YORK = ZoneInfo("America/New_York")
 UTC = ZoneInfo("UTC")
 SCHEDULE_URL = "https://www.bls.gov/schedule/{year}/"
-TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
+CALENDAR_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
+ALFRED_TIMESTAMP_SOURCE = "ALFRED first vintage date + official BLS 08:30 Eastern release time"
 
 RELEASES = {
     "us_cpi_release": {
         "release_prefix": "Consumer Price Index for ",
         "event_name": "Consumer Price Index",
+        "alfred_series": "us_cpi_yoy",
+        "crosscheck_series": "us_core_cpi_yoy",
+        "source_series_id": "CPIAUCSL",
     },
     "us_employment_situation": {
         "release_prefix": "Employment Situation for ",
         "event_name": "Employment Situation",
+        "alfred_series": "us_payroll_growth",
+        "crosscheck_series": "us_unemployment",
+        "source_series_id": "PAYEMS",
     },
 }
 
@@ -76,8 +87,6 @@ REFERENCE_PATTERN = re.compile(
 
 
 class TableRowParser(HTMLParser):
-    """Collect visible cell text from HTML table rows without extra dependencies."""
-
     def __init__(self) -> None:
         super().__init__()
         self.in_row = False
@@ -164,19 +173,13 @@ def classify_release(release_text: str) -> tuple[str, dict] | None:
     return None
 
 
-def build_row(
-    *,
-    event_type: str,
-    spec: dict,
-    release_text: str,
-    release_date: datetime | None,
-    release_time: tuple[int, int] | None,
-    source_url: str,
-    calendar_year: int,
+def build_calendar_row(
+    *, event_type: str, spec: dict, release_text: str,
+    release_date: datetime | None, release_time: tuple[int, int] | None,
+    source_url: str, calendar_year: int,
 ) -> dict:
     reasons: list[str] = []
     reference_period = parse_reference_period(release_text)
-
     if release_date is None:
         reasons.append("calendar_release_date_not_parsed")
     if release_time is None:
@@ -194,7 +197,6 @@ def build_row(
         utc_dt = local_dt.astimezone(UTC)
         if utc_dt > datetime.now(tz=UTC):
             reasons.append("future_scheduled_release")
-
     if release_date is not None and release_date.year != calendar_year:
         reasons.append("release_date_outside_calendar_year")
 
@@ -226,7 +228,7 @@ def build_row(
         "revised_previous": np.nan,
         "source": "U.S. Bureau of Labor Statistics",
         "source_url": source_url,
-        "timestamp_source": TIMESTAMP_SOURCE,
+        "timestamp_source": CALENDAR_TIMESTAMP_SOURCE,
         "timestamp_precision": "minute",
         "stated_timezone_abbreviation": tz_abbreviation,
         "model_eligible": model_eligible,
@@ -234,24 +236,22 @@ def build_row(
         "calendar_release_text": release_text,
         "calendar_release_date": release_date_iso,
         "calendar_year": calendar_year,
+        "provenance_tier": "direct_official_calendar",
     }
 
 
 def parse_schedule_page(content: str, source_url: str, calendar_year: int) -> list[dict]:
     parser = TableRowParser()
     parser.feed(content)
-
     rows: list[dict] = []
     last_date: datetime | None = None
     last_time: tuple[int, int] | None = None
 
     for cells in parser.rows:
-        joined = " | ".join(cells)
         row_date = next((parse_date(cell) for cell in cells if parse_date(cell) is not None), None)
         if row_date is not None:
             last_date = row_date
             last_time = None
-
         row_time = next((parse_time(cell) for cell in cells if parse_time(cell) is not None), None)
         if row_time is not None:
             last_time = row_time
@@ -265,20 +265,108 @@ def parse_schedule_page(content: str, source_url: str, calendar_year: int) -> li
                 break
         if classification is None or release_cell is None:
             continue
-
         event_type, spec = classification
-        rows.append(
-            build_row(
-                event_type=event_type,
-                spec=spec,
-                release_text=release_cell,
-                release_date=row_date or last_date,
-                release_time=row_time or last_time,
-                source_url=source_url,
-                calendar_year=calendar_year,
-            )
-        )
+        rows.append(build_calendar_row(
+            event_type=event_type,
+            spec=spec,
+            release_text=release_cell,
+            release_date=row_date or last_date,
+            release_time=row_time or last_time,
+            source_url=source_url,
+            calendar_year=calendar_year,
+        ))
+    return rows
 
+
+def first_real_vintage(frame: pd.DataFrame, series_id: str) -> pd.DataFrame:
+    source = frame[frame["series_id"].eq(series_id)].copy()
+    if source.empty:
+        return source
+    if "availability_method" in source.columns:
+        source = source[~source["availability_method"].astype(str).str.contains("bootstrap", case=False, na=False)]
+    source["observation_period"] = pd.to_datetime(source["observation_period"], utc=True, errors="coerce")
+    source["vintage_date"] = pd.to_datetime(source["vintage_date"], utc=True, errors="coerce")
+    source = source.dropna(subset=["observation_period", "vintage_date"])
+    source = source.sort_values(["observation_period", "vintage_date"])
+    return source.drop_duplicates("observation_period", keep="first")
+
+
+def alfred_fallback(start_year: int, end_year: int) -> list[dict]:
+    if not FRED_MACRO_FILE.exists():
+        raise RuntimeError(
+            "BLS returned HTTP 403 and the local FRED/ALFRED macro file is missing. "
+            f"Expected: {FRED_MACRO_FILE}"
+        )
+    macro = pd.read_parquet(FRED_MACRO_FILE, engine="pyarrow")
+    required = {"series_id", "observation_period", "vintage_date"}
+    missing = sorted(required.difference(macro.columns))
+    if missing:
+        raise RuntimeError("FRED macro fallback is missing columns: " + ", ".join(missing))
+
+    rows: list[dict] = []
+    for event_type, spec in RELEASES.items():
+        primary = first_real_vintage(macro, spec["alfred_series"])
+        crosscheck = first_real_vintage(macro, spec["crosscheck_series"])
+        if primary.empty:
+            raise RuntimeError(f"No ALFRED vintages available for {spec['alfred_series']}")
+        cross_map = dict(zip(crosscheck["observation_period"], crosscheck["vintage_date"]))
+
+        for record in primary.itertuples():
+            reference_period = record.observation_period
+            vintage = record.vintage_date
+            release_date = vintage.date()
+            if not (start_year <= release_date.year <= end_year):
+                continue
+
+            reasons: list[str] = []
+            cross_vintage = cross_map.get(reference_period)
+            if cross_vintage is None:
+                reasons.append("official_series_release_date_crosscheck_missing")
+            elif pd.Timestamp(cross_vintage).date() != release_date:
+                reasons.append("official_series_release_date_crosscheck_disagrees")
+
+            local_dt = datetime(
+                release_date.year, release_date.month, release_date.day,
+                8, 30, tzinfo=NEW_YORK,
+            )
+            utc_dt = local_dt.astimezone(UTC)
+            if utc_dt > datetime.now(tz=UTC):
+                reasons.append("future_scheduled_release")
+
+            event_id = f"bls:{event_type}:{utc_dt.strftime('%Y%m%dT%H%MZ')}"
+            rows.append({
+                "event_id": event_id,
+                "event_timestamp_utc": utc_dt,
+                "event_timestamp_local": local_dt.isoformat(),
+                "local_timezone": "America/New_York",
+                "country": "US",
+                "currency": "USD",
+                "event_type": event_type,
+                "event_name": spec["event_name"],
+                "reference_period": reference_period,
+                "actual": np.nan,
+                "forecast": np.nan,
+                "previous": np.nan,
+                "revised_previous": np.nan,
+                "source": "Federal Reserve Bank of St. Louis ALFRED + U.S. Bureau of Labor Statistics",
+                "source_url": f"https://fred.stlouisfed.org/series/{spec['source_series_id']}",
+                "timestamp_source": ALFRED_TIMESTAMP_SOURCE,
+                "timestamp_precision": "minute_reconstructed",
+                "stated_timezone_abbreviation": local_dt.tzname(),
+                "model_eligible": not reasons,
+                "quarantine_reason": ";".join(reasons),
+                "alfred_primary_series": spec["alfred_series"],
+                "alfred_crosscheck_series": spec["crosscheck_series"],
+                "alfred_first_vintage_date": release_date.isoformat(),
+                "provenance_tier": "dual_official_reconstruction",
+            })
+
+    if not rows:
+        raise RuntimeError("ALFRED fallback produced no candidate BLS events")
+    print(
+        "BLS calendar access is blocked; using labeled dual-official ALFRED/BLS timestamp reconstruction.",
+        flush=True,
+    )
     return rows
 
 
@@ -289,34 +377,27 @@ def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFram
 
     session = http_session()
     rows: list[dict] = []
+    blocked = False
     for year in range(start_year, end_year + 1):
         url = SCHEDULE_URL.format(year=year)
         response = session.get(url, timeout=90)
         if response.status_code == 403:
-            raise RuntimeError(
-                "BLS blocked the annual schedule request with HTTP 403. "
-                "The client is identifiable and deliberately low-volume; do not bypass the block. "
-                "Retry later or from a network that BLS permits."
-            )
+            blocked = True
+            break
         if not response.ok:
             raise RuntimeError(
-                f"BLS annual schedule request failed for {year} "
-                f"(HTTP {response.status_code}): {url}"
+                f"BLS annual schedule request failed for {year} (HTTP {response.status_code}): {url}"
             )
-
         year_rows = parse_schedule_page(response.text, url, year)
         if not year_rows:
             raise RuntimeError(f"No CPI/Employment Situation rows parsed from BLS schedule {year}")
         rows.extend(year_rows)
         counts = pd.Series([row["event_type"] for row in year_rows]).value_counts().to_dict()
-        print(
-            f"BLS schedule {year}: {len(year_rows):,} target events "
-            f"{counts}",
-            flush=True,
-        )
-        # One request per year is already light; keep a small delay as an extra
-        # courtesy to the public site.
+        print(f"BLS schedule {year}: {len(year_rows):,} target events {counts}", flush=True)
         time.sleep(0.75)
+
+    if blocked:
+        rows = alfred_fallback(start_year, end_year)
 
     frame = normalize_event_schema(pd.DataFrame(rows))
     safe = frame[frame["model_eligible"]].copy()
@@ -325,7 +406,6 @@ def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFram
     duplicate_ids = safe["event_id"].duplicated(keep=False)
     if duplicate_ids.any():
         raise RuntimeError(f"Duplicate eligible BLS event IDs: {int(duplicate_ids.sum())}")
-
     duplicate_reference = safe.duplicated(["event_type", "reference_period"], keep=False)
     if duplicate_reference.any():
         raise RuntimeError(
