@@ -16,7 +16,9 @@ BLS_FILE = DATA_DIRECTORY / "bls_release_events.parquet"
 REPORT_FILE = REPORT_DIRECTORY / "event_data_quality_report.txt"
 COVERAGE_FILE = REPORT_DIRECTORY / "event_coverage.csv"
 EXPECTED_BLS_TYPES = {"us_cpi_release", "us_employment_situation"}
-EXPECTED_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
+DIRECT_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
+RECONSTRUCTED_TIMESTAMP_SOURCE = "ALFRED first vintage date + official BLS 08:30 Eastern release time"
+ALLOWED_TIMESTAMP_SOURCES = {DIRECT_TIMESTAMP_SOURCE, RECONSTRUCTED_TIMESTAMP_SOURCE}
 
 
 @dataclass
@@ -81,16 +83,44 @@ def validate(write_report: bool = True) -> ValidationResult:
                     f"{int(before_reference.sum())} releases occur before their reference month"
                 )
 
-            wrong_source = eligible["timestamp_source"].ne(EXPECTED_TIMESTAMP_SOURCE)
+            wrong_source = ~eligible["timestamp_source"].isin(ALLOWED_TIMESTAMP_SOURCES)
             if wrong_source.any():
                 failures.append(
-                    f"{int(wrong_source.sum())} eligible BLS rows do not use official annual-calendar timestamps"
+                    f"{int(wrong_source.sum())} eligible BLS rows use unsupported timestamp provenance"
                 )
 
-            wrong_precision = eligible["timestamp_precision"].ne("minute")
-            if wrong_precision.any():
+            reconstructed = eligible["timestamp_source"].eq(RECONSTRUCTED_TIMESTAMP_SOURCE)
+            if reconstructed.any():
+                warnings.append(
+                    f"{int(reconstructed.sum())} eligible events use dual-official reconstruction: "
+                    "ALFRED first-vintage release date plus BLS 08:30 Eastern time; direct BLS calendar access was blocked"
+                )
+                if "provenance_tier" not in eligible.columns:
+                    failures.append("Reconstructed events lack provenance_tier metadata")
+                else:
+                    bad_tier = reconstructed & eligible["provenance_tier"].ne("dual_official_reconstruction")
+                    if bad_tier.any():
+                        failures.append(
+                            f"{int(bad_tier.sum())} reconstructed events have invalid provenance_tier"
+                        )
+                if "alfred_crosscheck_series" not in eligible.columns:
+                    failures.append("Reconstructed events lack ALFRED cross-check metadata")
+
+            direct = eligible["timestamp_source"].eq(DIRECT_TIMESTAMP_SOURCE)
+            if direct.any() and "provenance_tier" in eligible.columns:
+                bad_direct = direct & eligible["provenance_tier"].ne("direct_official_calendar")
+                if bad_direct.any():
+                    failures.append(f"{int(bad_direct.sum())} direct-calendar events have invalid provenance tier")
+
+            allowed_precision = eligible["timestamp_precision"].isin({"minute", "minute_reconstructed"})
+            if (~allowed_precision).any():
                 failures.append(
-                    f"{int(wrong_precision.sum())} eligible rows lack minute timestamp precision"
+                    f"{int((~allowed_precision).sum())} eligible rows lack minute-level timestamp precision"
+                )
+            bad_reconstructed_precision = reconstructed & eligible["timestamp_precision"].ne("minute_reconstructed")
+            if bad_reconstructed_precision.any():
+                failures.append(
+                    f"{int(bad_reconstructed_precision.sum())} reconstructed rows are not explicitly labeled minute_reconstructed"
                 )
 
             wrong_timezone = eligible["local_timezone"].ne("America/New_York")
@@ -110,8 +140,6 @@ def validate(write_report: bool = True) -> ValidationResult:
             if missing_types:
                 failures.append("Missing expected BLS event types: " + ", ".join(missing_types))
 
-            # V0.4A deliberately has no consensus provider yet. A non-null forecast
-            # would be a provenance error, not a feature.
             if eligible["forecast"].notna().any():
                 failures.append("Forecast values exist before a trusted consensus source is configured")
 
@@ -171,8 +199,9 @@ def validate(write_report: bool = True) -> ValidationResult:
         [
             "",
             "V0.4A SAFETY RULES",
-            "- Model-eligible BLS timestamps come from official annual BLS release calendars.",
-            "- BLS annual calendars provide the release date and minute and state that calendar times are Eastern Time.",
+            "- Preferred timestamps come directly from official annual BLS release calendars.",
+            "- If BLS blocks calendar access, dates may be reconstructed from first non-bootstrap ALFRED vintages and cross-checked against a second official series.",
+            "- Reconstructed rows use the official 08:30 Eastern CPI/Employment release time and are explicitly labeled minute_reconstructed.",
             "- America/New_York performs historical DST conversion; no fixed UTC offset is used.",
             "- Future scheduled releases are quarantined rather than treated as historical observations.",
             "- Consensus forecast values remain empty until a trustworthy historical provider exists.",
