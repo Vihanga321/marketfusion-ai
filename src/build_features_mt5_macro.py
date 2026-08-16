@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from build_features_mt5 import FEATURES_MT5, OUTPUT_FILE as PRICE_FEATURE_FILE
-from macro.common import DATA_DIRECTORY, REPORT_DIRECTORY
+from macro.common import REPORT_DIRECTORY
 from macro.validate_macro_data import SAFE_OUTPUT, validate
 
 
@@ -40,6 +40,15 @@ AVAILABILITY_FEATURES = [f"{feature}_available" for feature in BASE_MACRO_FEATUR
 MACRO_FEATURES = BASE_MACRO_FEATURES + DERIVED_MACRO_FEATURES + CHANGE_FEATURES + AVAILABILITY_FEATURES + [
     "macro_release_day"
 ]
+
+# Release-day regimes should represent discrete macro/policy events, not daily
+# market context such as Treasury yields or effective overnight rates.
+RELEASE_EVENT_SERIES = {
+    "us_cpi_yoy", "us_core_cpi_yoy", "us_unemployment", "us_payroll_growth",
+    "us_gdp_growth", "us_pce", "us_core_pce", "us_retail_sales_yoy",
+    "ecb_rate", "euro_hicp", "euro_core_hicp", "euro_unemployment", "euro_gdp_growth",
+}
+POLICY_CHANGE_SERIES = {"ecb_rate"}
 
 
 def latest_observation_events(series: pd.DataFrame) -> pd.DataFrame:
@@ -81,9 +90,6 @@ def values_asof(events: pd.DataFrame, decisions: pd.Series) -> pd.DataFrame:
 
 
 def build_features() -> pd.DataFrame:
-    # Final V0.3 feature generation requires both U.S. FRED/ALFRED and ECB
-    # point-in-time inputs. A partial safe subset may still be inspected with
-    # validate_macro_data.py, but it is not enough for the full comparison.
     result = validate(write_report=True, require_complete=True)
     if not result.passed:
         raise RuntimeError("Complete macro validation failed; feature generation blocked: " + "; ".join(result.failures))
@@ -133,16 +139,20 @@ def build_features() -> pd.DataFrame:
     market["yield_differential"] = market["us_10y_yield"] - market["euro_10y_yield"]
 
     release_timestamps = []
-    for _, source in macro.groupby("series_id"):
+    release_source = macro[macro["series_id"].isin(RELEASE_EVENT_SERIES)].copy()
+    for series_id, source in release_source.groupby("series_id"):
         source = source.sort_values(["available_from_utc", "observation_period"])
-        is_daily_effective_rate = source["availability_method"].eq(
-            "effective_date_nonrevised_policy_rate"
-        )
-        if is_daily_effective_rate.all():
+        if series_id in POLICY_CHANGE_SERIES:
             source = source[source["value"].ne(source["value"].shift())]
         release_timestamps.extend(source["available_from_utc"].dropna().tolist())
     release_dates = pd.DatetimeIndex(release_timestamps).normalize().unique()
     market["macro_release_day"] = market["decision_timestamp"].dt.normalize().isin(release_dates).astype("int8")
+    release_fraction = float(market["macro_release_day"].mean())
+    if release_fraction > 0.75:
+        raise ValueError(
+            f"Macro release-day flag covers {release_fraction:.1%} of market rows; "
+            "daily context appears to have leaked into the event regime definition"
+        )
 
     missing_columns = sorted(set(FEATURES_MT5 + MACRO_FEATURES).difference(market.columns))
     if missing_columns:
@@ -163,13 +173,18 @@ def build_features() -> pd.DataFrame:
         "safe_macro_input": str(SAFE_OUTPUT),
         "rule": "available_from_utc <= decision_timestamp",
         "requires_complete_macro": True,
+        "release_event_series": sorted(RELEASE_EVENT_SERIES),
+        "release_day_definition": "non-daily macro/policy availability day; daily yield/rate context excluded",
     }
     REPORT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     MANIFEST_FILE.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print("Complete macro validation: PASS")
     print(f"Market rows: {len(market):,}")
     print(f"Macro model features: {len(MACRO_FEATURES)}")
-    print(f"Rows on macro release days: {int(market['macro_release_day'].sum()):,}")
+    print(
+        f"Rows on macro release days: {int(market['macro_release_day'].sum()):,} "
+        f"({release_fraction:.1%})"
+    )
     print(f"Saved: {OUTPUT_FILE}")
     print(f"Manifest: {MANIFEST_FILE}")
     return market
