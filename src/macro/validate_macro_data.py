@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,7 @@ except ImportError:  # Support direct execution.
 SAFE_OUTPUT = DATA_DIRECTORY / "macro_safe.parquet"
 REPORT_FILE = REPORT_DIRECTORY / "macro_data_quality_report.txt"
 ADAPTER_FILES = (DATA_DIRECTORY / "fred_macro.parquet", DATA_DIRECTORY / "ecb_macro.parquet")
+REQUIRED_COMPLETE_FILES = {"fred_macro.parquet", "ecb_macro.parquet"}
 EXPECTED_SERIES = {
     "fed_funds_rate", "us_2y_yield", "us_10y_yield", "us_cpi_yoy", "us_core_cpi_yoy",
     "us_pce", "us_core_pce", "us_unemployment", "us_payroll_growth", "us_gdp_growth",
@@ -45,13 +47,17 @@ def load_frames(paths: tuple[Path, ...]) -> tuple[pd.DataFrame, list[str]]:
     return (pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()), loaded
 
 
-def validate(write_report: bool = True) -> ValidationResult:
+def validate(write_report: bool = True, require_complete: bool = False) -> ValidationResult:
     data, loaded = load_frames(ADAPTER_FILES)
     quarantine_paths = tuple(sorted(QUARANTINE_DIRECTORY.glob("*.parquet"))) if QUARANTINE_DIRECTORY.exists() else ()
     quarantine, quarantine_loaded = load_frames(quarantine_paths)
     failures: list[str] = []
     warnings: list[str] = []
     details: list[str] = []
+
+    missing_required_files = sorted(REQUIRED_COMPLETE_FILES.difference(loaded))
+    if require_complete and missing_required_files:
+        failures.append("Complete macro validation requires adapter files: " + ", ".join(missing_required_files))
 
     if data.empty:
         failures.append("No model-eligible adapter files were found")
@@ -118,7 +124,9 @@ def validate(write_report: bool = True) -> ValidationResult:
             if missing_series:
                 warnings.append("Expected series unavailable for safe modeling: " + ", ".join(missing_series))
             if "fred_macro.parquet" not in loaded:
-                warnings.append("FRED/ALFRED file absent (FRED_API_KEY was not available during this run)")
+                warnings.append("FRED/ALFRED file absent; U.S. point-in-time macro coverage is incomplete")
+            if "ecb_macro.parquet" not in loaded:
+                warnings.append("ECB file absent; Eurozone point-in-time macro coverage is incomplete")
 
     if not quarantine.empty:
         warnings.append(f"{len(quarantine):,} non-model-eligible rows remain quarantined")
@@ -134,6 +142,7 @@ def validate(write_report: bool = True) -> ValidationResult:
         "MARKETFUSION AI V0.3 - MACRO DATA QUALITY REPORT",
         "=" * 68,
         f"Generated UTC: {pd.Timestamp.now(tz='UTC').isoformat()}",
+        f"Validation mode: {'COMPLETE' if require_complete else 'SAFE_SUBSET'}",
         f"Adapter files: {', '.join(loaded) if loaded else 'none'}",
         f"Quarantine files: {', '.join(quarantine_loaded) if quarantine_loaded else 'none'}",
         f"Eligible input rows: {len(safe):,}",
@@ -165,6 +174,7 @@ def validate(write_report: bool = True) -> ValidationResult:
         REPORT_DIRECTORY.mkdir(parents=True, exist_ok=True)
         REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
         print(f"VALIDATION_STATUS: {'PASS' if passed else 'FAIL'}")
+        print(f"Validation mode: {'COMPLETE' if require_complete else 'SAFE_SUBSET'}")
         print(f"Safe rows: {len(safe):,}")
         print(f"Report: {REPORT_FILE}")
         if passed:
@@ -172,7 +182,18 @@ def validate(write_report: bool = True) -> ValidationResult:
     return ValidationResult(passed, failures, warnings, len(safe))
 
 
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="Fail unless both FRED/ALFRED and ECB model-eligible adapter files are present.",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    result = validate(write_report=True)
+    args = arguments()
+    result = validate(write_report=True, require_complete=args.require_complete)
     if not result.passed:
         raise SystemExit("ERROR: Macro validation failed: " + "; ".join(result.failures))
