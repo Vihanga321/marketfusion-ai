@@ -8,7 +8,8 @@ No result in this repository should be interpreted as a live-trading recommendat
 
 - **V0.1:** Yahoo Finance daily baseline. Preserved because validation exposed a candle-data artifact and a misleading high apparent accuracy.
 - **V0.2:** Clean MT5 historical H1/H4 price pipeline plus a read-only live EUR/USD tick collector. OANDA files are retained but are not the active data path.
-- **V0.3:** Point-in-time macroeconomic intelligence using official FRED/ALFRED, ECB, and quarantined BLS data where historical release timestamps are unavailable.
+- **V0.3:** Point-in-time macroeconomic intelligence using official FRED/ALFRED and ECB data with explicit vintage/availability semantics. BLS values without historical release timestamps remain quarantined from the macro-level model.
+- **V0.4A (in progress):** exact economic-release timestamps and event provenance. The first adapter reconstructs historical BLS CPI and Employment Situation timestamps directly from official archived release embargo lines before any event-reaction modeling.
 
 ## Read-only MetaTrader 5 tick layer
 
@@ -111,6 +112,17 @@ Only after macro validation passes:
 ```
 
 `download_fred.py` stops rather than silently falling back when `FRED_API_KEY` is absent. Only `data/macro/macro_safe.parquet` is eligible for feature joins. The matched walk-forward comparison uses the same yearly test boundaries and embargo as the clean MT5 price-only evaluation.
+
+## V0.4A economic event timestamps
+
+V0.4A begins the Economic Surprise Engine by solving event time and provenance before adding forecasts or reaction models. For BLS releases, model-eligible timestamps come from official archived release pages and their embargo lines. `America/New_York` is used for historical Eastern-time conversion, so EST/EDT is not treated as a fixed UTC offset.
+
+```powershell
+.\venv\Scripts\python.exe src\events\download_bls_release_calendar.py --start-year 2015
+.\venv\Scripts\python.exe src\events\validate_event_table.py
+```
+
+The initial event schema includes `actual`, `forecast`, `previous`, and `revised_previous`, but V0.4A intentionally leaves consensus forecasts empty until a trustworthy historical forecast provider is established. The validator fails if forecast values appear without that provenance. Later V0.4 stages will add BEA/FOMC/ECB event sources, actual/revision fields, MT5 event-window reactions, and historical analogue retrieval.
 
 ## Security and safety
 
