@@ -1,0 +1,53 @@
+MARKETFUSION AI - MT5 EURUSD H4 HISTORY QUALITY REPORT
+==============================================================================
+Data file: C:\Users\vihan\marketfusion-ai\data\mt5\history\EURUSD_H4.parquet
+Bars: 16,525
+First timestamp: 2016-01-04 00:00:00+00:00
+Last timestamp: 2026-08-14 20:00:00+00:00
+Stored timestamp dtype: datetime64[ms, UTC]
+UTC timezone-aware storage: True
+Sorted timestamps: True
+Duplicate timestamps: 0 (0.0000%)
+Current incomplete candle excluded: True
+
+PRICE AND CANDLE CHECKS
+------------------------------------------------------------------------------
+NaN rows: 0 (0.0000%)
+Infinite rows: 0 (0.0000%)
+Non-positive price rows: 0 (0.0000%)
+High enclosure violations: 0 (0.0000%)
+Low enclosure violations: 0 (0.0000%)
+High < low: 0 (0.0000%)
+Zero-range candles: 0 (0.0000%)
+Open == close: 55 (0.3328%)
+Extreme absolute returns > 5%: 0 (0.0000%)
+
+MISSING BARS AND SPREAD
+------------------------------------------------------------------------------
+Missing grid bars: 6,731
+Expected weekend missing bars: 6,636
+Missing weekday/session bars: 95
+Missing weekday samples: 2016-12-26 00:00:00+00:00, 2017-12-25 00:00:00+00:00, 2017-12-25 04:00:00+00:00, 2017-12-25 08:00:00+00:00, 2017-12-25 12:00:00+00:00, 2017-12-25 16:00:00+00:00, 2017-12-25 20:00:00+00:00, 2017-12-26 00:00:00+00:00, 2018-01-01 00:00:00+00:00, 2018-01-01 04:00:00+00:00, 2018-01-01 08:00:00+00:00, 2018-01-01 12:00:00+00:00, 2018-01-01 16:00:00+00:00, 2018-01-01 20:00:00+00:00, 2018-12-25 00:00:00+00:00, 2018-12-25 04:00:00+00:00, 2018-12-25 08:00:00+00:00, 2018-12-25 12:00:00+00:00, 2018-12-25 16:00:00+00:00, 2018-12-25 20:00:00+00:00
+Negative spread_points: 0 (0.0000%)
+Median spread_points: 1.000
+95th percentile spread_points: 8.000
+99th percentile spread_points: 8.000
+Maximum spread_points: 112.000
+Extreme spread threshold: 100.000
+Extreme spread rows: 1 (0.0061%)
+
+NEXT-BAR ARTIFACT CHECKS
+------------------------------------------------------------------------------
+Consecutive bar pairs tested: 15,960
+Next close inside current high-low: 8,452 (52.9574%)
+Current wick-imbalance next-direction accuracy: 0.5016
+Upper-wick correlation with next return: -0.0000
+Lower-wick correlation with next return: 0.0173
+Next open exactly equals current close: 7,660 (47.9950%)
+
+Invalid rows: 0
+VALIDATION_STATUS: PASS
+WARNINGS:
+- 95 missing weekday bars; likely holidays/session closures, and target creation must exclude them
+- Extreme spread_points above 100.0: 1
+No blocking integrity or Yahoo-style predictive artifact was detected.

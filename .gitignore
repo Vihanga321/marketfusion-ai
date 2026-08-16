@@ -6,4 +6,6 @@ __pycache__/
 !.env.example
 *.parquet
 data/mt5/ticks/
+data/mt5/history/
+data/processed/*.parquet
 .vscode/

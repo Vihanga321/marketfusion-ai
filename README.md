@@ -25,6 +25,19 @@ The collector uses MT5 tick-history ranges to recover ticks between polling cycl
 
 The live status timestamp comes from each tick's `time_msc`, not from the local computer clock. During a normal FX weekend closure, the collector prints `no fresh tick` and does not manufacture or save the stale `symbol_info_tick` snapshot.
 
+### Historical MT5 bars
+
+The historical pipeline reads H1 and H4 bars from the already logged-in terminal, removes the current incomplete bar, validates each timeframe, and gates all downstream work on the H1 result.
+
+```powershell
+.\venv\Scripts\python.exe src\download_mt5_history.py
+.\venv\Scripts\python.exe src\validate_mt5_history.py
+.\venv\Scripts\python.exe src\build_features_mt5.py
+.\venv\Scripts\python.exe src\walk_forward_validation_mt5.py
+```
+
+Historical Parquet files are ignored by Git. Missing market-session bars are never synthesized, and forecast targets crossing a missing or weekend gap are excluded.
+
 ## Setup
 
 ```powershell
@@ -76,6 +89,28 @@ Both downstream scripts independently rerun the OANDA validation gate. They stop
 - XGBoost importance: `reports/v02_feature_importance_{1h|4h}.csv`
 
 Parquet datasets and `.env` are intentionally ignored by Git. `.env.example` is safe to commit because it contains placeholders only.
+
+## V0.3 macroeconomic intelligence
+
+V0.3 treats publication time as part of every observation. It never joins a
+macro value before `available_from_utc`, and retains vintage metadata for audit.
+ALFRED date-only vintages are conservatively usable from the next UTC day. ECB
+revised series use SDMX `VALID_FROM`. BLS current values are quarantined because
+the time-series API does not provide their historical release timestamps.
+
+```powershell
+.\venv\Scripts\python.exe src\macro\download_fred.py
+.\venv\Scripts\python.exe src\macro\download_bls.py
+.\venv\Scripts\python.exe src\macro\download_ecb.py
+.\venv\Scripts\python.exe src\macro\validate_macro_data.py
+.\venv\Scripts\python.exe src\build_features_mt5_macro.py
+.\venv\Scripts\python.exe src\walk_forward_validation_mt5_macro.py
+```
+
+`download_fred.py` stops rather than silently falling back when `FRED_API_KEY`
+is absent. Only `data/macro/macro_safe.parquet` is eligible for feature joins.
+The matched walk-forward comparison uses the same yearly test boundaries and
+embargo as the clean MT5 price-only evaluation.
 
 ## Forecast timing and costs
 
