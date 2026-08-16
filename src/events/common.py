@@ -49,9 +49,18 @@ def http_session() -> requests.Session:
         allowed_methods=frozenset({"GET"}),
     )
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": "MarketFusion-AI/0.4 (read-only economic-event research)"
-    })
+    # BLS may block automated clients that do not identify an owner. Keep the
+    # crawler transparent and low-volume rather than pretending to be a browser.
+    session.headers.update(
+        {
+            "User-Agent": (
+                "MarketFusion-AI/0.4 read-only research "
+                "(+https://github.com/Vihanga321/marketfusion-ai)"
+            ),
+            "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.8",
+        }
+    )
     session.mount("https://", HTTPAdapter(max_retries=retry))
     return session
 
