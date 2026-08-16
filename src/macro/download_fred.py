@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from datetime import date
 
 import pandas as pd
@@ -16,6 +17,7 @@ except ImportError:  # Support direct execution: python src/macro/download_fred.
 
 ENDPOINT = "https://api.stlouisfed.org/fred/series/observations"
 OUTPUT_FILE = DATA_DIRECTORY / "fred_macro.parquet"
+FRED_KEY_PATTERN = re.compile(r"^[a-z0-9]{32}$")
 
 # ALFRED output_type=2 retains revisions. Daily market/rate observations use
 # output_type=4 (initial release) to avoid an impractically large vintage cube.
@@ -32,6 +34,22 @@ SERIES = {
     "us_gdp_growth": {"source_id": "A191RL1Q225SBEA", "frequency": "Q", "units": "lin", "output_type": 2},
     "us_retail_sales_yoy": {"source_id": "RSAFS", "frequency": "M", "units": "pc1", "output_type": 2},
 }
+
+
+def fred_api_key() -> str:
+    """Return a validated FRED key without ever printing or logging it."""
+    api_key = os.getenv("FRED_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError(
+            "FRED_API_KEY is not set. Put the private key in the project .env file; "
+            "no substitute or revised-latest data was used."
+        )
+    if api_key == "replace_with_your_fred_api_key" or not FRED_KEY_PATTERN.fullmatch(api_key):
+        raise RuntimeError(
+            "FRED_API_KEY is present but does not look like a registered FRED key "
+            "(expected 32 lowercase alphanumeric characters)."
+        )
+    return api_key
 
 
 def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> pd.DataFrame:
@@ -54,7 +72,15 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
             "offset": offset,
         }
         response = session.get(ENDPOINT, params=parameters, timeout=90)
-        response.raise_for_status()
+        if not response.ok:
+            try:
+                payload = response.json()
+                message = payload.get("error_message") or payload.get("message") or "unknown API error"
+            except ValueError:
+                message = "non-JSON API error response"
+            raise RuntimeError(
+                f"FRED/ALFRED request failed for {name} (HTTP {response.status_code}): {message}"
+            )
         payload = response.json()
         observations = payload.get("observations", [])
         for observation in observations:
@@ -87,12 +113,7 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
 
 
 def download(start: str = "2015-01-01", end: str | None = None) -> pd.DataFrame:
-    api_key = os.getenv("FRED_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError(
-            "FRED_API_KEY is not set. Official FRED/ALFRED downloads require a key; "
-            "no substitute or revised-latest data was used."
-        )
+    api_key = fred_api_key()
     end = end or date.today().isoformat()
     frames = []
     for name, spec in SERIES.items():
