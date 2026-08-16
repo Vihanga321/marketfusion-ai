@@ -24,22 +24,23 @@ FRED_KEY_PATTERN = re.compile(r"^[a-z0-9]{32}$")
 # 2015-present in one real-time window exceeds that limit for daily series, so
 # every series is downloaded in non-overlapping calendar-year real-time windows.
 #
-# output_type=3 keeps only new/revised observations for revision-prone macro
-# series. That is enough to reconstruct point-in-time state without downloading
-# the very large repeated vintage cube from output_type=2.
-# output_type=4 returns initial releases only and is used for daily rates/yields.
+# FRED only permits output_type 3/4 with units=lin. Therefore transformed series
+# (pc1/chg) use output_type=2 so FRED computes the transformation at each vintage.
+# We then compress the repeated vintage cube locally to only the first value and
+# subsequent revisions for each observation period. Native-level revision series
+# can use output_type=3 directly; daily rates/yields use output_type=4.
 SERIES = {
     "fed_funds_rate": {"source_id": "DFF", "frequency": "D", "units": "lin", "output_type": 4},
     "us_2y_yield": {"source_id": "DGS2", "frequency": "D", "units": "lin", "output_type": 4},
     "us_10y_yield": {"source_id": "DGS10", "frequency": "D", "units": "lin", "output_type": 4},
-    "us_cpi_yoy": {"source_id": "CPIAUCSL", "frequency": "M", "units": "pc1", "output_type": 3},
-    "us_core_cpi_yoy": {"source_id": "CPILFESL", "frequency": "M", "units": "pc1", "output_type": 3},
-    "us_pce": {"source_id": "PCEPI", "frequency": "M", "units": "pc1", "output_type": 3},
-    "us_core_pce": {"source_id": "PCEPILFE", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_cpi_yoy": {"source_id": "CPIAUCSL", "frequency": "M", "units": "pc1", "output_type": 2},
+    "us_core_cpi_yoy": {"source_id": "CPILFESL", "frequency": "M", "units": "pc1", "output_type": 2},
+    "us_pce": {"source_id": "PCEPI", "frequency": "M", "units": "pc1", "output_type": 2},
+    "us_core_pce": {"source_id": "PCEPILFE", "frequency": "M", "units": "pc1", "output_type": 2},
     "us_unemployment": {"source_id": "UNRATE", "frequency": "M", "units": "lin", "output_type": 3},
-    "us_payroll_growth": {"source_id": "PAYEMS", "frequency": "M", "units": "chg", "output_type": 3},
+    "us_payroll_growth": {"source_id": "PAYEMS", "frequency": "M", "units": "chg", "output_type": 2},
     "us_gdp_growth": {"source_id": "A191RL1Q225SBEA", "frequency": "Q", "units": "lin", "output_type": 3},
-    "us_retail_sales_yoy": {"source_id": "RSAFS", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_retail_sales_yoy": {"source_id": "RSAFS", "frequency": "M", "units": "pc1", "output_type": 2},
 }
 
 
@@ -60,13 +61,7 @@ def fred_api_key() -> str:
 
 
 def parse_fred_date(value: object) -> pd.Timestamp | pd.NaT:
-    """Parse FRED's YYYY-MM-DD date fields without pandas' generic parser.
-
-    FRED/ALFRED returns date-only ISO strings here. On the project's Python 3.14
-    environment, repeatedly calling ``pd.to_datetime`` for thousands of scalar
-    strings can spend excessive time inside pandas/typing internals. The stdlib
-    ISO parser is deterministic and much cheaper for this known format.
-    """
+    """Parse FRED's YYYY-MM-DD date fields without pandas' generic parser."""
     if value is None:
         return pd.NaT
     text = str(value).strip()
@@ -94,8 +89,24 @@ def realtime_windows(start: str, end: str):
 
 def checkpoint_path(name: str, spec: dict, start: str, end: str):
     return CHECKPOINT_DIRECTORY / (
-        f"{name}_{spec['source_id']}_ot{spec['output_type']}_{start}_{end}.parquet"
+        f"{name}_{spec['source_id']}_ot{spec['output_type']}_{spec['units']}_{start}_{end}.parquet"
     )
+
+
+def compress_vintage_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """Keep only first-seen and revised values from an output_type=2 vintage cube."""
+    if frame.empty:
+        return frame
+    result = frame.drop_duplicates(
+        ["observation_period", "vintage_date", "value"], keep="last"
+    ).copy()
+    result = result.sort_values(
+        ["observation_period", "vintage_date", "available_from_utc"],
+        na_position="last",
+    )
+    previous = result.groupby("observation_period", sort=False)["value"].shift()
+    keep = previous.isna() | result["value"].ne(previous)
+    return result.loc[keep].reset_index(drop=True)
 
 
 def fetch_window(
@@ -107,7 +118,7 @@ def fetch_window(
     observation_end: str,
     realtime_start: str,
     realtime_end: str,
-) -> list[dict]:
+) -> pd.DataFrame:
     rows: list[dict] = []
     offset = 0
     while True:
@@ -165,11 +176,15 @@ def fetch_window(
         offset += len(observations)
         if not observations or offset >= int(payload.get("count", offset)):
             break
-    return rows
+
+    frame = pd.DataFrame(rows)
+    if spec["output_type"] == 2 and not frame.empty:
+        frame = compress_vintage_rows(frame)
+    return frame
 
 
 def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> pd.DataFrame:
-    rows: list[dict] = []
+    chunks: list[pd.DataFrame] = []
     session = http_session()
     for realtime_start, realtime_end in realtime_windows(start, end):
         chunk = fetch_window(
@@ -182,13 +197,16 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
             realtime_start=realtime_start,
             realtime_end=realtime_end,
         )
-        rows.extend(chunk)
+        chunks.append(chunk)
         print(
             f"  {name} {realtime_start}..{realtime_end}: "
-            f"{len(chunk):,} new/revised rows",
+            f"{len(chunk):,} retained point-in-time rows",
             flush=True,
         )
-    return pd.DataFrame(rows)
+    frame = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+    if spec["output_type"] == 2 and not frame.empty:
+        frame = compress_vintage_rows(frame)
+    return frame
 
 
 def download(start: str = "2015-01-01", end: str | None = None, resume: bool = True) -> pd.DataFrame:
