@@ -16,6 +16,7 @@ BLS_FILE = DATA_DIRECTORY / "bls_release_events.parquet"
 REPORT_FILE = REPORT_DIRECTORY / "event_data_quality_report.txt"
 COVERAGE_FILE = REPORT_DIRECTORY / "event_coverage.csv"
 EXPECTED_BLS_TYPES = {"us_cpi_release", "us_employment_situation"}
+EXPECTED_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
 
 
 @dataclass
@@ -80,10 +81,10 @@ def validate(write_report: bool = True) -> ValidationResult:
                     f"{int(before_reference.sum())} releases occur before their reference month"
                 )
 
-            wrong_source = eligible["timestamp_source"].ne("BLS archived release embargo line")
+            wrong_source = eligible["timestamp_source"].ne(EXPECTED_TIMESTAMP_SOURCE)
             if wrong_source.any():
                 failures.append(
-                    f"{int(wrong_source.sum())} eligible BLS rows do not use archive embargo timestamps"
+                    f"{int(wrong_source.sum())} eligible BLS rows do not use official annual-calendar timestamps"
                 )
 
             wrong_precision = eligible["timestamp_precision"].ne("minute")
@@ -96,6 +97,12 @@ def validate(write_report: bool = True) -> ValidationResult:
             if wrong_timezone.any():
                 failures.append(
                     f"{int(wrong_timezone.sum())} eligible BLS rows use the wrong local timezone"
+                )
+
+            bad_local = ~eligible["stated_timezone_abbreviation"].isin({"EST", "EDT"})
+            if bad_local.any():
+                failures.append(
+                    f"{int(bad_local.sum())} eligible rows lack a valid historical Eastern timezone abbreviation"
                 )
 
             represented = set(eligible["event_type"].unique())
@@ -164,9 +171,10 @@ def validate(write_report: bool = True) -> ValidationResult:
         [
             "",
             "V0.4A SAFETY RULES",
-            "- Exact model-eligible BLS timestamps come from archived release embargo lines.",
+            "- Model-eligible BLS timestamps come from official annual BLS release calendars.",
+            "- BLS annual calendars provide the release date and minute and state that calendar times are Eastern Time.",
             "- America/New_York performs historical DST conversion; no fixed UTC offset is used.",
-            "- Archive filename dates are audit checks, never the source of the event time.",
+            "- Future scheduled releases are quarantined rather than treated as historical observations.",
             "- Consensus forecast values remain empty until a trustworthy historical provider exists.",
             "",
             f"VALIDATION_STATUS: {'PASS' if passed else 'FAIL'}",
