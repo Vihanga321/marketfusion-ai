@@ -51,6 +51,7 @@ public final class EventWindowExporter {
     private static final long MINUTE_MS = 60_000L;
     private static final long WINDOW_BEFORE_MS = 10L * MINUTE_MS;
     private static final long WINDOW_AFTER_MS = 250L * MINUTE_MS;
+    private static final long CONNECT_TIMEOUT_SECONDS = 45L;
 
     private EventWindowExporter() {
     }
@@ -78,6 +79,7 @@ public final class EventWindowExporter {
         System.out.println("Instrument: EUR/USD, period: ONE_MIN, sides: BID + ASK");
 
         final IClient client = ClientFactory.getDefaultInstance();
+        final CountDownLatch connected = new CountDownLatch(1);
         client.setSystemListener(new ISystemListener() {
             @Override
             public void onStart(long processId) {
@@ -92,6 +94,7 @@ public final class EventWindowExporter {
             @Override
             public void onConnect() {
                 System.out.println("Connected to Dukascopy DEMO JForex3 endpoint.");
+                connected.countDown();
             }
 
             @Override
@@ -101,9 +104,14 @@ public final class EventWindowExporter {
         });
 
         try {
+            System.out.println("Connecting to Dukascopy...");
             client.connect(DEMO_JNLP, username, password);
-            if (!client.isConnected()) {
-                throw new IllegalStateException("Dukascopy client did not reach connected state");
+            if (!connected.await(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS) || !client.isConnected()) {
+                throw new IllegalStateException(
+                        "Dukascopy client did not reach connected state within "
+                                + CONNECT_TIMEOUT_SECONDS
+                                + " seconds"
+                );
             }
 
             client.setSubscribedInstruments(Collections.singleton(INSTRUMENT));
