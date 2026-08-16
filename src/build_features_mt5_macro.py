@@ -81,9 +81,12 @@ def values_asof(events: pd.DataFrame, decisions: pd.Series) -> pd.DataFrame:
 
 
 def build_features() -> pd.DataFrame:
-    result = validate(write_report=True)
+    # Final V0.3 feature generation requires both U.S. FRED/ALFRED and ECB
+    # point-in-time inputs. A partial safe subset may still be inspected with
+    # validate_macro_data.py, but it is not enough for the full comparison.
+    result = validate(write_report=True, require_complete=True)
     if not result.passed:
-        raise RuntimeError("Macro validation failed; feature generation blocked: " + "; ".join(result.failures))
+        raise RuntimeError("Complete macro validation failed; feature generation blocked: " + "; ".join(result.failures))
     if not PRICE_FEATURE_FILE.exists():
         raise FileNotFoundError(f"Clean MT5 features not found: {PRICE_FEATURE_FILE}")
 
@@ -136,8 +139,6 @@ def build_features() -> pd.DataFrame:
             "effective_date_nonrevised_policy_rate"
         )
         if is_daily_effective_rate.all():
-            # The ECB portal repeats the effective policy rate daily. Only a
-            # value change is an event; unchanged daily rows are not releases.
             source = source[source["value"].ne(source["value"].shift())]
         release_timestamps.extend(source["available_from_utc"].dropna().tolist())
     release_dates = pd.DatetimeIndex(release_timestamps).normalize().unique()
@@ -161,10 +162,11 @@ def build_features() -> pd.DataFrame:
         "audit_timestamp_suffix": "__available_from_utc",
         "safe_macro_input": str(SAFE_OUTPUT),
         "rule": "available_from_utc <= decision_timestamp",
+        "requires_complete_macro": True,
     }
     REPORT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     MANIFEST_FILE.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print("Macro validation: PASS")
+    print("Complete macro validation: PASS")
     print(f"Market rows: {len(market):,}")
     print(f"Macro model features: {len(MACRO_FEATURES)}")
     print(f"Rows on macro release days: {int(market['macro_release_day'].sum()):,}")
