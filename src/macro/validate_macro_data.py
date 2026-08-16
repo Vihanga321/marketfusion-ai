@@ -26,6 +26,24 @@ EXPECTED_SERIES = {
     "euro_unemployment", "euro_gdp_growth", "euro_2y_yield", "euro_10y_yield",
 }
 
+# Complete V0.3 is defined as a 2015-present US macro history. These minimums
+# prevent a malformed adapter response from passing merely because every series
+# name exists. They are deliberately conservative relative to the expected
+# number of observations over the full period.
+FRED_MIN_UNIQUE_OBSERVATIONS = {
+    "fed_funds_rate": 1_000,
+    "us_2y_yield": 1_000,
+    "us_10y_yield": 1_000,
+    "us_cpi_yoy": 100,
+    "us_core_cpi_yoy": 100,
+    "us_pce": 100,
+    "us_core_pce": 100,
+    "us_unemployment": 100,
+    "us_payroll_growth": 100,
+    "us_gdp_growth": 30,
+    "us_retail_sales_yoy": 100,
+}
+
 
 @dataclass
 class ValidationResult:
@@ -122,11 +140,45 @@ def validate(write_report: bool = True, require_complete: bool = False) -> Valid
             available_series = set(safe["series_id"].unique())
             missing_series = sorted(EXPECTED_SERIES.difference(available_series))
             if missing_series:
-                warnings.append("Expected series unavailable for safe modeling: " + ", ".join(missing_series))
+                message = "Expected series unavailable for safe modeling: " + ", ".join(missing_series)
+                if require_complete:
+                    failures.append(message)
+                else:
+                    warnings.append(message)
+
             if "fred_macro.parquet" not in loaded:
                 warnings.append("FRED/ALFRED file absent; U.S. point-in-time macro coverage is incomplete")
             if "ecb_macro.parquet" not in loaded:
                 warnings.append("ECB file absent; Eurozone point-in-time macro coverage is incomplete")
+
+            if require_complete and "fred_macro.parquet" in loaded:
+                fred = safe[safe["input_file"] == "fred_macro.parquet"]
+                freshness_floor = pd.Timestamp(
+                    year=max(2015, pd.Timestamp.now(tz="UTC").year - 1), month=1, day=1, tz="UTC"
+                )
+                for series_id, minimum in FRED_MIN_UNIQUE_OBSERVATIONS.items():
+                    group = fred[fred["series_id"] == series_id]
+                    if group.empty:
+                        failures.append(f"FRED complete coverage missing series: {series_id}")
+                        continue
+                    observations = int(group["observation_period"].nunique())
+                    if observations < minimum:
+                        failures.append(
+                            f"FRED {series_id} has only {observations} unique observations; "
+                            f"minimum for complete 2015-present coverage is {minimum}"
+                        )
+                    availability_years = int(group["available_from_utc"].dt.year.nunique())
+                    if availability_years < 5:
+                        failures.append(
+                            f"FRED {series_id} spans only {availability_years} availability years; "
+                            "historical point-in-time coverage is incomplete"
+                        )
+                    latest = group["available_from_utc"].max()
+                    if pd.isna(latest) or latest < freshness_floor:
+                        failures.append(
+                            f"FRED {series_id} latest availability is {latest}; expected coverage into "
+                            f"{freshness_floor.year} or later"
+                        )
 
     if not quarantine.empty:
         warnings.append(f"{len(quarantine):,} non-model-eligible rows remain quarantined")
@@ -187,7 +239,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument(
         "--require-complete",
         action="store_true",
-        help="Fail unless both FRED/ALFRED and ECB model-eligible adapter files are present.",
+        help="Fail unless both FRED/ALFRED and ECB model-eligible adapter files are present with complete US coverage.",
     )
     return parser.parse_args()
 
