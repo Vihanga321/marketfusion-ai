@@ -1,0 +1,7 @@
+MARKETFUSION AI - MT5 EURUSD TICK QUALITY REPORT
+==============================================================================
+Tick directory: C:\Users\vihan\marketfusion-ai\data\mt5\ticks
+Total ticks: 0
+VALIDATION_STATUS: FAIL
+FAILURES:
+- No EURUSD tick Parquet files found

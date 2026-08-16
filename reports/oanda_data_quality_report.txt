@@ -1,0 +1,7 @@
+MARKETFUSION AI V0.2 - OANDA EUR/USD H1 DATA QUALITY REPORT
+==============================================================================
+Data file: C:\Users\vihan\marketfusion-ai\data\oanda\eurusd_h1.parquet
+Rows: 0
+VALIDATION_STATUS: FAIL
+FAILURES:
+- OANDA Parquet file does not exist
