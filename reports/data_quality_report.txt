@@ -1,0 +1,93 @@
+MARKETFUSION AI - EUR/USD DATA QUALITY REPORT
+========================================================================
+Raw file:       C:\Users\vihan\marketfusion-ai\data\raw\eurusd_daily.csv
+Feature file:   C:\Users\vihan\marketfusion-ai\data\processed\eurusd_features.csv
+
+1. SCHEMA AND COVERAGE
+------------------------------------------------------------------------
+Raw shape: 2,602 rows x 7 columns
+Raw columns: date, open, high, low, close, adj_close, volume
+Missing required raw columns: none
+Feature shape: 2,552 rows x 35 columns
+Feature columns: date, open, high, low, close, adj_close, volume, return_1d, return_3d, return_5d, return_10d, range, body, upper_wick, lower_wick, ma_5, ma_10, ma_20, ma_50, price_vs_ma10, price_vs_ma20, ma10_vs_ma20, rsi_14, volatility_5, volatility_10, volatility_20, atr_14, momentum_3, momentum_5, momentum_10, day_of_week, month, future_close, future_return, target
+Raw invalid dates: 0
+Raw date range: 2016-08-15 to 2026-08-14
+Raw duplicated timestamps: 0
+Raw timestamps sorted ascending: True
+Raw duplicate full rows: 0
+Feature invalid dates: 0
+Feature date range: 2016-10-21 to 2026-08-13
+Feature duplicated timestamps: 0
+Feature timestamps sorted ascending: True
+Feature duplicate full rows: 0
+
+2. MISSING DATES AND GAPS
+------------------------------------------------------------------------
+Missing Monday-Friday dates (includes legitimate market holidays): 8
+Missing weekday samples: 2017-07-11, 2017-11-16, 2019-05-22, 2025-01-01, 2025-04-18, 2025-04-21, 2025-12-25, 2026-01-01
+Calendar gaps longer than 3 days: 1
+Largest gaps ending on: 2025-04-22 (5 days), 2016-08-22 (3 days), 2016-08-29 (3 days), 2016-09-05 (3 days), 2016-09-12 (3 days), 2016-09-19 (3 days), 2016-09-26 (3 days), 2016-10-03 (3 days), 2016-10-10 (3 days), 2016-10-17 (3 days)
+
+3. NULL, NUMERIC, AND PRICE SANITY CHECKS
+------------------------------------------------------------------------
+Raw NaN cells: 0
+Feature NaN cells: 0
+Raw non-numeric values in numeric columns: 0
+Raw infinite numeric values: 0
+Non-positive OHLC rows: 0 (0.00%)
+OHLC rows outside broad EUR/USD sanity range [0.5, 2.0]: 0 (0.00%)
+Lowest observed price: 0.95401639
+Highest observed price: 1.25580812
+Feature infinite numeric values: 0
+
+4. OHLC CONSISTENCY
+------------------------------------------------------------------------
+High < low: 0 (0.00%)
+High < open: 12 (0.46%)
+High < close: 33 (1.27%)
+Low > open: 11 (0.42%)
+Low > close: 34 (1.31%)
+Rows with any OHLC enclosure violation: 67 (2.57%)
+Maximum high/low enclosure error: 0.00306380
+Violation date samples: 2016-08-30, 2016-10-31, 2016-11-21, 2016-12-29, 2017-02-02, 2017-02-27, 2017-03-10, 2017-06-05, 2017-09-19, 2017-10-10, 2017-11-02, 2018-04-25, 2018-06-04, 2018-06-29, 2018-07-02
+Exact open == close: 1,042 (40.05%)
+Open within 0.1 pip of close: 1,043 (40.08%)
+Zero-range candles: 0 (0.00%)
+
+5. UNUSUAL CANDLE BEHAVIOR
+------------------------------------------------------------------------
+Median daily range: 0.5359%
+99th percentile daily range: 1.6223%
+IQR extreme-range cutoff: 1.6987%
+Candles above IQR extreme cutoff: 21 (0.81%)
+Absolute close-to-close returns > 5%: 0 (0.00%)
+Largest range dates: 2016-11-09 (3.340%), 2025-04-10 (2.486%), 2022-11-10 (2.447%), 2025-04-03 (2.300%), 2016-12-08 (2.291%), 2024-11-06 (2.283%), 2020-03-19 (2.259%), 2020-03-12 (2.238%), 2023-03-15 (2.235%), 2020-03-17 (2.070%)
+
+6. VOLUME AND YAHOO FINANCE ARTIFACT CHECKS
+------------------------------------------------------------------------
+Zero volume rows: 2,602 (100.00%)
+Distinct volume values: 1
+Close == adjusted close: 2,602 (100.00%)
+Next close lies inside current high-low range: 1,933 (74.32%)
+Current wick-imbalance next-direction accuracy: 0.8074
+Correlation current upper space vs next return: 0.6628
+Correlation current lower space vs next return: -0.6788
+CRITICAL: Current high/low geometry predicts the next timestamp unusually well.
+This is consistent with a Yahoo daily-FX bar alignment artifact and makes same-row wick/range features unsafe until independently verified.
+
+7. PROCESSED DATA AND TARGET INTEGRITY
+------------------------------------------------------------------------
+Missing target columns: none
+future_close mismatches vs raw next close: 0
+future_return mismatches vs raw next return: 0
+target mismatches vs recomputed target: 0
+Target class 0: 1,301 (50.98%)
+Target class 1: 1,251 (49.02%)
+Future/target-named columns present in processed CSV: future_close, future_return, target
+These columns are valid labels/diagnostics only and must never enter X.
+
+8. OVERALL ASSESSMENT
+------------------------------------------------------------------------
+The files are structurally complete and the target calculation is internally consistent.
+However, zero volume, frequent open==close, OHLC enclosure violations, and especially the predictive same-row high/low geometry are serious Yahoo FX artifacts.
+Any accuracy driven by upper_wick, lower_wick, range, high, or low should be treated as leakage-like and not as deployable forecasting skill.
