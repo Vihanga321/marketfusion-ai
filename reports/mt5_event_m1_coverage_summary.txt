@@ -1,0 +1,16 @@
+MARKETFUSION AI V0.4A - MT5 M1 EVENT WINDOW COVERAGE AUDIT
+========================================================================
+Events audited: 276
+Complete M1 reaction windows: 7/276 (2.54%)
+Required points: pre-event plus 1m, 5m, 15m, 60m, 240m post-event closes
+
+BY EVENT TYPE
+                         events  complete  coverage_pct
+event_type                                             
+us_cpi_release              138         4          2.90
+us_employment_situation     138         3          2.17
+
+INTERPRETATION
+- This is a data-availability audit only; it does not calculate returns or claim an edge.
+- Incomplete windows must not be silently filled or interpolated.
+- If old M1 windows are unavailable from MT5, another trustworthy historical intraday source is required for short-horizon reactions.

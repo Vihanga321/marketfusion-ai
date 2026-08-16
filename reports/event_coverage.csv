@@ -1,0 +1,3 @@
+event_type,event_count,reference_months,first_release_utc,last_release_utc
+us_cpi_release,138,138,2015-01-16 13:30:00+00:00,2026-08-12 12:30:00+00:00
+us_employment_situation,138,138,2015-01-09 13:30:00+00:00,2026-08-07 12:30:00+00:00
