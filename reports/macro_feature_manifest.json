@@ -105,5 +105,22 @@
   ],
   "audit_timestamp_suffix": "__available_from_utc",
   "safe_macro_input": "C:\\Users\\vihan\\marketfusion-ai\\data\\macro\\macro_safe.parquet",
-  "rule": "available_from_utc <= decision_timestamp"
+  "rule": "available_from_utc <= decision_timestamp",
+  "requires_complete_macro": true,
+  "release_event_series": [
+    "ecb_rate",
+    "euro_core_hicp",
+    "euro_gdp_growth",
+    "euro_hicp",
+    "euro_unemployment",
+    "us_core_cpi_yoy",
+    "us_core_pce",
+    "us_cpi_yoy",
+    "us_gdp_growth",
+    "us_payroll_growth",
+    "us_pce",
+    "us_retail_sales_yoy",
+    "us_unemployment"
+  ],
+  "release_day_definition": "non-daily macro/policy availability day; daily yield/rate context excluded"
 }

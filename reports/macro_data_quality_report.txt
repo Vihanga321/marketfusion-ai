@@ -1,10 +1,11 @@
 MARKETFUSION AI V0.3 - MACRO DATA QUALITY REPORT
 ====================================================================
-Generated UTC: 2026-08-16T12:37:26.027662+00:00
-Adapter files: ecb_macro.parquet
+Generated UTC: 2026-08-16T16:26:50.784908+00:00
+Validation mode: COMPLETE
+Adapter files: fred_macro.parquet, ecb_macro.parquet
 Quarantine files: bls_current_values.parquet, ecb_unusable_rows.parquet
-Eligible input rows: 4,984
-Series represented: 7
+Eligible input rows: 22,403
+Series represented: 18
 
 SERIES COVERAGE
 - ecb_rate: rows=4,245, observations=4,245, available=2015-01-01 00:00:00+00:00 to 2026-08-15 00:00:00+00:00
@@ -14,16 +15,26 @@ SERIES COVERAGE
 - euro_gdp_growth: rows=45, observations=45, available=2026-07-15 09:14:38+00:00 to 2026-07-15 09:14:38+00:00
 - euro_hicp: rows=139, observations=139, available=2026-01-28 10:00:04+00:00 to 2026-07-31 09:21:07+00:00
 - euro_unemployment: rows=138, observations=138, available=2026-01-23 18:39:29+00:00 to 2026-07-30 09:00:00+00:00
+- fed_funds_rate: rows=4,243, observations=4,243, available=2015-01-06 00:00:00+00:00 to 2026-08-15 00:00:00+00:00
+- us_10y_yield: rows=2,904, observations=2,904, available=2015-01-06 00:00:00+00:00 to 2026-08-15 00:00:00+00:00
+- us_2y_yield: rows=2,904, observations=2,904, available=2015-01-06 00:00:00+00:00 to 2026-08-15 00:00:00+00:00
+- us_core_cpi_yoy: rows=752, observations=150, available=2015-01-02 00:00:00+00:00 to 2026-08-13 00:00:00+00:00
+- us_core_pce: rows=1,198, observations=150, available=2015-01-02 00:00:00+00:00 to 2026-07-31 00:00:00+00:00
+- us_cpi_yoy: rows=753, observations=150, available=2015-01-02 00:00:00+00:00 to 2026-08-13 00:00:00+00:00
+- us_gdp_growth: rows=341, observations=54, available=2015-01-02 00:00:00+00:00 to 2026-07-31 00:00:00+00:00
+- us_payroll_growth: rows=1,326, observations=162, available=2015-01-02 00:00:00+00:00 to 2026-08-08 00:00:00+00:00
+- us_pce: rows=1,202, observations=150, available=2015-01-02 00:00:00+00:00 to 2026-07-31 00:00:00+00:00
+- us_retail_sales_yoy: rows=1,520, observations=151, available=2015-01-02 00:00:00+00:00 to 2026-08-15 00:00:00+00:00
+- us_unemployment: rows=276, observations=162, available=2015-01-02 00:00:00+00:00 to 2026-08-08 00:00:00+00:00
 
 REVISION CHECKS
-Observation periods with multiple recorded values: 0
+Observation periods with multiple recorded values: 1,026
+Revision counts by series: {'us_core_cpi_yoy': 143, 'us_core_pce': 149, 'us_cpi_yoy': 143, 'us_gdp_growth': 53, 'us_payroll_growth': 161, 'us_pce': 149, 'us_retail_sales_yoy': 150, 'us_unemployment': 78}
 
 FAILURES
 - None
 
 WARNINGS
-- Expected series unavailable for safe modeling: fed_funds_rate, us_10y_yield, us_2y_yield, us_core_cpi_yoy, us_core_pce, us_cpi_yoy, us_gdp_growth, us_payroll_growth, us_pce, us_retail_sales_yoy, us_unemployment
-- FRED/ALFRED file absent (FRED_API_KEY was not available during this run)
 - 557 non-model-eligible rows remain quarantined
 
 LEAKAGE POLICY
