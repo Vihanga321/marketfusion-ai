@@ -17,6 +17,7 @@ except ImportError:  # Support direct execution: python src/macro/download_fred.
 
 ENDPOINT = "https://api.stlouisfed.org/fred/series/observations"
 OUTPUT_FILE = DATA_DIRECTORY / "fred_macro.parquet"
+CHECKPOINT_DIRECTORY = DATA_DIRECTORY / "fred_parts"
 FRED_KEY_PATTERN = re.compile(r"^[a-z0-9]{32}$")
 
 # FRED limits JSON/XML observation requests to 2,000 vintage dates. Querying
@@ -58,6 +59,26 @@ def fred_api_key() -> str:
     return api_key
 
 
+def parse_fred_date(value: object) -> pd.Timestamp | pd.NaT:
+    """Parse FRED's YYYY-MM-DD date fields without pandas' generic parser.
+
+    FRED/ALFRED returns date-only ISO strings here. On the project's Python 3.14
+    environment, repeatedly calling ``pd.to_datetime`` for thousands of scalar
+    strings can spend excessive time inside pandas/typing internals. The stdlib
+    ISO parser is deterministic and much cheaper for this known format.
+    """
+    if value is None:
+        return pd.NaT
+    text = str(value).strip()
+    if not text:
+        return pd.NaT
+    try:
+        parsed = date.fromisoformat(text[:10])
+    except ValueError:
+        return pd.NaT
+    return pd.Timestamp(parsed, tz="UTC")
+
+
 def realtime_windows(start: str, end: str):
     """Yield non-overlapping calendar-year real-time windows."""
     first = date.fromisoformat(start)
@@ -71,7 +92,14 @@ def realtime_windows(start: str, end: str):
         cursor = window_end + timedelta(days=1)
 
 
+def checkpoint_path(name: str, spec: dict, start: str, end: str):
+    return CHECKPOINT_DIRECTORY / (
+        f"{name}_{spec['source_id']}_ot{spec['output_type']}_{start}_{end}.parquet"
+    )
+
+
 def fetch_window(
+    session,
     name: str,
     spec: dict,
     api_key: str,
@@ -80,7 +108,6 @@ def fetch_window(
     realtime_start: str,
     realtime_end: str,
 ) -> list[dict]:
-    session = http_session()
     rows: list[dict] = []
     offset = 0
     while True:
@@ -114,7 +141,7 @@ def fetch_window(
         for observation in observations:
             if observation.get("value") in {None, "."}:
                 continue
-            vintage = pd.to_datetime(observation.get("realtime_start"), utc=True, errors="coerce")
+            vintage = parse_fred_date(observation.get("realtime_start"))
             # ALFRED vintage metadata is date-granular. Delaying use until the
             # next UTC day prevents same-day release-time look-ahead.
             available = vintage + pd.Timedelta(days=1) if pd.notna(vintage) else pd.NaT
@@ -143,8 +170,10 @@ def fetch_window(
 
 def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> pd.DataFrame:
     rows: list[dict] = []
+    session = http_session()
     for realtime_start, realtime_end in realtime_windows(start, end):
         chunk = fetch_window(
+            session,
             name,
             spec,
             api_key,
@@ -156,27 +185,36 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
         rows.extend(chunk)
         print(
             f"  {name} {realtime_start}..{realtime_end}: "
-            f"{len(chunk):,} new/revised rows"
+            f"{len(chunk):,} new/revised rows",
+            flush=True,
         )
     return pd.DataFrame(rows)
 
 
-def download(start: str = "2015-01-01", end: str | None = None) -> pd.DataFrame:
+def download(start: str = "2015-01-01", end: str | None = None, resume: bool = True) -> pd.DataFrame:
     api_key = fred_api_key()
     end = end or date.today().isoformat()
     frames = []
     for name, spec in SERIES.items():
-        frame = fetch_series(name, spec, api_key, start, end)
-        if frame.empty:
-            raise RuntimeError(f"FRED/ALFRED returned no usable rows for {name}")
+        checkpoint = checkpoint_path(name, spec, start, end)
+        if resume and checkpoint.exists():
+            frame = pd.read_parquet(checkpoint, engine="pyarrow")
+            print(f"FRED/ALFRED {name}: resumed {len(frame):,} rows from checkpoint", flush=True)
+        else:
+            frame = fetch_series(name, spec, api_key, start, end)
+            if frame.empty:
+                raise RuntimeError(f"FRED/ALFRED returned no usable rows for {name}")
+            CHECKPOINT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+            atomic_parquet(frame, checkpoint)
+            print(f"FRED/ALFRED {name}: {len(frame):,} point-in-time rows", flush=True)
         frames.append(frame)
-        print(f"FRED/ALFRED {name}: {len(frame):,} point-in-time rows")
+
     result = normalize_schema(pd.concat(frames, ignore_index=True))
     result = result.drop_duplicates(
         ["series_id", "observation_period", "available_from_utc", "value"], keep="last"
     )
     atomic_parquet(result, OUTPUT_FILE)
-    print(f"Saved {len(result):,} rows: {OUTPUT_FILE}")
+    print(f"Saved {len(result):,} rows: {OUTPUT_FILE}", flush=True)
     return result
 
 
@@ -184,12 +222,17 @@ def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start", default="2015-01-01")
     parser.add_argument("--end", default=None)
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Ignore per-series checkpoints and redownload every series.",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = arguments()
     try:
-        download(args.start, args.end)
+        download(args.start, args.end, resume=not args.no_resume)
     except (RuntimeError, ValueError) as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
