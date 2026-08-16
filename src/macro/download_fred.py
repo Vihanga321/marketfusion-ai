@@ -21,11 +21,12 @@ OUTPUT_FILE = DATA_DIRECTORY / "fred_macro.parquet"
 CHECKPOINT_DIRECTORY = DATA_DIRECTORY / "fred_parts"
 FRED_KEY_PATTERN = re.compile(r"^[a-z0-9]{32}$")
 
-# FRED only permits transformed units with the all-vintages output format.
-# Instead of parsing that cross-tab format, MarketFusion downloads raw levels
-# with output_type=3 (new/revised observations) and reconstructs the requested
-# transformations locally using the official FRED formulas. This keeps the
-# event stream explicit and point-in-time auditable.
+# FRED output_type=1 is "Observations by Real-Time Period" and returns the
+# standard date/value/realtime_start/realtime_end row structure. That is the
+# safest format for replaying revisions. Daily rates/yields use output_type=4
+# because only their initial daily values are needed as slow market context.
+# Transforms are calculated locally from raw point-in-time levels so every input
+# value and revision remains explicit and auditable.
 SERIES = {
     "fed_funds_rate": {
         "source_id": "DFF", "frequency": "D", "transform": "lin", "api_output_type": 4,
@@ -38,33 +39,33 @@ SERIES = {
     },
     "us_cpi_yoy": {
         "source_id": "CPIAUCSL", "frequency": "M", "transform": "pc1",
-        "api_output_type": 3, "lag_months": 12,
+        "api_output_type": 1, "lag_months": 12,
     },
     "us_core_cpi_yoy": {
         "source_id": "CPILFESL", "frequency": "M", "transform": "pc1",
-        "api_output_type": 3, "lag_months": 12,
+        "api_output_type": 1, "lag_months": 12,
     },
     "us_pce": {
         "source_id": "PCEPI", "frequency": "M", "transform": "pc1",
-        "api_output_type": 3, "lag_months": 12,
+        "api_output_type": 1, "lag_months": 12,
     },
     "us_core_pce": {
         "source_id": "PCEPILFE", "frequency": "M", "transform": "pc1",
-        "api_output_type": 3, "lag_months": 12,
+        "api_output_type": 1, "lag_months": 12,
     },
     "us_unemployment": {
-        "source_id": "UNRATE", "frequency": "M", "transform": "lin", "api_output_type": 3,
+        "source_id": "UNRATE", "frequency": "M", "transform": "lin", "api_output_type": 1,
     },
     "us_payroll_growth": {
         "source_id": "PAYEMS", "frequency": "M", "transform": "chg",
-        "api_output_type": 3, "lag_months": 1,
+        "api_output_type": 1, "lag_months": 1,
     },
     "us_gdp_growth": {
-        "source_id": "A191RL1Q225SBEA", "frequency": "Q", "transform": "lin", "api_output_type": 3,
+        "source_id": "A191RL1Q225SBEA", "frequency": "Q", "transform": "lin", "api_output_type": 1,
     },
     "us_retail_sales_yoy": {
         "source_id": "RSAFS", "frequency": "M", "transform": "pc1",
-        "api_output_type": 3, "lag_months": 12,
+        "api_output_type": 1, "lag_months": 12,
     },
 }
 
@@ -90,7 +91,7 @@ def parse_fred_date(value: object) -> pd.Timestamp | pd.NaT:
     if value is None:
         return pd.NaT
     text = str(value).strip()
-    if not text:
+    if not text or text == ".":
         return pd.NaT
     try:
         parsed = date.fromisoformat(text[:10])
@@ -115,7 +116,7 @@ def realtime_windows(start: str, end: str):
 def checkpoint_path(name: str, spec: dict, start: str, end: str):
     output_type = spec["api_output_type"]
     transform = spec["transform"]
-    # Preserve compatibility with the already-created rate/yield checkpoints.
+    # Preserve the already-created output_type=4 rate/yield checkpoints.
     if output_type == 4 and transform == "lin":
         filename = f"{name}_{spec['source_id']}_ot4_{start}_{end}.parquet"
     else:
@@ -136,7 +137,7 @@ def raw_window(
     realtime_end: str,
     output_type: int,
 ) -> pd.DataFrame:
-    """Fetch one standard FRED observation window in untransformed levels."""
+    """Fetch one FRED window that uses the standard observation row layout."""
     rows: list[dict] = []
     offset = 0
     while True:
@@ -223,10 +224,17 @@ def fetch_yearly_events(
         )
         chunks.append(chunk)
         print(
-            f"  {name} {window_start}..{window_end}: {len(chunk):,} raw vintage rows",
+            f"  {name} {window_start}..{window_end}: {len(chunk):,} raw real-time rows",
             flush=True,
         )
-    return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+    if not chunks:
+        return pd.DataFrame()
+    result = pd.concat(chunks, ignore_index=True)
+    if result.empty:
+        return result
+    return result.drop_duplicates(
+        ["observation_period", "vintage_date", "raw_value"], keep="last"
+    ).reset_index(drop=True)
 
 
 def baseline_snapshot(
@@ -307,6 +315,7 @@ def reconstruct_series(
     bootstrap: pd.DataFrame,
     events: pd.DataFrame,
     start: str,
+    end: str,
 ) -> pd.DataFrame:
     """Reconstruct a point-in-time transformed event stream from raw levels."""
     if bootstrap.empty:
@@ -323,9 +332,8 @@ def reconstruct_series(
     rows: list[dict] = []
     last_emitted: dict[pd.Timestamp, float] = {}
 
-    # Conservative baseline: values known on the start date are made usable on
-    # the following UTC day, rather than pretending we know their exact intraday
-    # publication time.
+    # Conservative baseline: values known on the start date are usable from the
+    # following UTC day because historical intraday publication time is unknown.
     for period in sorted(state):
         transformed = local_transform(state, period, spec)
         if transformed is None or not np.isfinite(transformed):
@@ -345,6 +353,11 @@ def reconstruct_series(
     if events.empty:
         return pd.DataFrame(rows)
 
+    event_start = pd.Timestamp(date.fromisoformat(start) + timedelta(days=1), tz="UTC")
+    event_end = pd.Timestamp(date.fromisoformat(end), tz="UTC")
+    events = events[
+        (events["vintage_date"] >= event_start) & (events["vintage_date"] <= event_end)
+    ].copy()
     events = events.sort_values(["vintage_date", "observation_period"]).drop_duplicates(
         ["vintage_date", "observation_period", "raw_value"], keep="last"
     )
@@ -373,7 +386,7 @@ def reconstruct_series(
                     observation_period=period,
                     vintage=vintage,
                     value=transformed,
-                    method=f"alfred_raw_vintage_plus_1d_local_{spec['transform']}",
+                    method=f"alfred_realtime_period_plus_1d_local_{spec['transform']}",
                 )
             )
             last_emitted[period] = float(transformed)
@@ -386,7 +399,7 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
     transform = spec["transform"]
     output_type = spec["api_output_type"]
 
-    # Initial-release-only daily series already provide the event stream directly.
+    # Initial-release-only daily series already provide the required event stream.
     if output_type == 4 and transform == "lin":
         raw = fetch_yearly_events(
             session,
@@ -412,8 +425,6 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
         ]
         return pd.DataFrame(rows)
 
-    # Revision-prone level/transformed series need a state snapshot at the start
-    # plus the subsequent new/revised raw-level events.
     lookback_months = max(24, int(spec.get("lag_months", 0)) + 12)
     start_timestamp = pd.Timestamp(date.fromisoformat(start))
     lookback_start = (start_timestamp - pd.DateOffset(months=lookback_months)).date().isoformat()
@@ -436,12 +447,18 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
         realtime_start=event_start,
         realtime_end=end,
     )
-    return reconstruct_series(name, spec, bootstrap, events, start)
+    return reconstruct_series(name, spec, bootstrap, events, start, end)
 
 
 def download(start: str = "2015-01-01", end: str | None = None, resume: bool = True) -> pd.DataFrame:
     api_key = fred_api_key()
     end = end or date.today().isoformat()
+
+    # A previous failed/incomplete run must never leave a stale aggregate file
+    # that could be mistaken for the output of this run. Per-series checkpoints
+    # remain available for safe resume.
+    OUTPUT_FILE.unlink(missing_ok=True)
+
     frames = []
     for name, spec in SERIES.items():
         checkpoint = checkpoint_path(name, spec, start, end)
