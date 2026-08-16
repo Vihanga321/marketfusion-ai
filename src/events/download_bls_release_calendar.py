@@ -1,18 +1,22 @@
 """Build exact historical BLS CPI and Employment Situation release timestamps.
 
-The downloader uses only official BLS archive pages. Model-eligible timestamps must
-come from the release's own embargo line; dates inferred from filenames are used
-only as an audit cross-check. Historical Eastern time is converted with
-America/New_York so daylight-saving transitions are handled by timezone rules.
+V0.4A uses the official annual BLS release calendars instead of downloading every
+archived news-release page. Each calendar row contains the release date, exact
+minute, release name, and reference period; BLS states that calendar times are
+Eastern Time. America/New_York converts those local timestamps to UTC with
+historical daylight-saving rules.
+
+This design is intentionally low-volume: normally one official schedule page per
+year. It does not fabricate actual values or consensus forecasts.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import time
 from datetime import datetime
 from html.parser import HTMLParser
-from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -36,24 +40,21 @@ except ImportError:  # Support direct execution: python src/events/download_bls_
     )
 
 
-BLS_BASE = "https://www.bls.gov"
 OUTPUT_FILE = DATA_DIRECTORY / "bls_release_events.parquet"
 QUARANTINE_FILE = QUARANTINE_DIRECTORY / "bls_release_events_unusable.parquet"
 NEW_YORK = ZoneInfo("America/New_York")
 UTC = ZoneInfo("UTC")
+SCHEDULE_URL = "https://www.bls.gov/schedule/{year}/"
+TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
 
 RELEASES = {
     "us_cpi_release": {
-        "archive_index": "https://www.bls.gov/bls/news-release/cpi.htm",
-        "archive_slug": "cpi",
+        "release_prefix": "Consumer Price Index for ",
         "event_name": "Consumer Price Index",
-        "reference_label": "Consumer Price Index",
     },
     "us_employment_situation": {
-        "archive_index": "https://www.bls.gov/bls/news-release/empsit.htm",
-        "archive_slug": "empsit",
+        "release_prefix": "Employment Situation for ",
         "event_name": "Employment Situation",
-        "reference_label": "Employment Situation",
     },
 }
 
@@ -61,154 +62,153 @@ MONTHS = (
     "January|February|March|April|May|June|July|August|September|October|November|December"
 )
 WEEKDAYS = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
-
-# BLS archived releases historically use wording such as:
-#   8:30 a.m. (EST) January 20, 2016
-#   8:30 a.m. (EDT) Friday, July 8, 2016
-# Newer pages may use ET. We still localize through America/New_York rather than
-# applying a fixed UTC offset.
-EMBARGO_PATTERN = re.compile(
-    rf"(?P<hour>\d{{1,2}}):(?P<minute>\d{{2}})\s*"
-    rf"(?P<ampm>a\.?\s*m\.?|p\.?\s*m\.?)\s*"
-    rf"\((?P<tz>EST|EDT|ET)\)\s*"
-    rf"(?:(?:{WEEKDAYS})\s*,?\s*)?"
-    rf"(?P<month>{MONTHS})\s+(?P<day>\d{{1,2}}),\s*(?P<year>\d{{4}})",
-    flags=re.IGNORECASE,
+DATE_PATTERN = re.compile(
+    rf"(?:(?:{WEEKDAYS})\s*,?\s*)?(?P<month>{MONTHS})\s+"
+    rf"(?P<day>\d{{1,2}}),\s*(?P<year>\d{{4}})",
+    re.IGNORECASE,
+)
+TIME_PATTERN = re.compile(
+    r"(?P<hour>\d{1,2}):(?P<minute>\d{2})\s*(?P<ampm>AM|PM)", re.IGNORECASE
+)
+REFERENCE_PATTERN = re.compile(
+    rf"\bfor\s+(?P<month>{MONTHS})\s+(?P<year>\d{{4}})\b", re.IGNORECASE
 )
 
 
-class LinkCollector(HTMLParser):
+class TableRowParser(HTMLParser):
+    """Collect visible cell text from HTML table rows without extra dependencies."""
+
     def __init__(self) -> None:
         super().__init__()
-        self._href: str | None = None
-        self._text: list[str] = []
-        self.links: list[tuple[str, str]] = []
+        self.in_row = False
+        self.in_cell = False
+        self.current_cell: list[str] = []
+        self.current_row: list[str] = []
+        self.rows: list[list[str]] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag.lower() != "a":
-            return
-        self._href = dict(attrs).get("href")
-        self._text = []
+        tag = tag.lower()
+        if tag == "tr":
+            self.in_row = True
+            self.current_row = []
+        elif self.in_row and tag in {"td", "th"}:
+            self.in_cell = True
+            self.current_cell = []
 
     def handle_data(self, data: str) -> None:
-        if self._href is not None:
-            self._text.append(data)
+        if self.in_cell:
+            text = data.strip()
+            if text:
+                self.current_cell.append(text)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() == "a" and self._href is not None:
-            text = " ".join(part.strip() for part in self._text if part.strip())
-            self.links.append((self._href, text))
-            self._href = None
-            self._text = []
+        tag = tag.lower()
+        if self.in_row and tag in {"td", "th"} and self.in_cell:
+            text = re.sub(r"\s+", " ", " ".join(self.current_cell)).strip()
+            self.current_row.append(text)
+            self.current_cell = []
+            self.in_cell = False
+        elif tag == "tr" and self.in_row:
+            if self.current_row:
+                self.rows.append(self.current_row)
+            self.current_row = []
+            self.in_row = False
+            self.in_cell = False
 
 
-class TextExtractor(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.parts: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        text = data.strip()
-        if text:
-            self.parts.append(text)
-
-    def text(self) -> str:
-        return re.sub(r"\s+", " ", " ".join(self.parts)).strip()
+def parse_date(text: str) -> datetime | None:
+    match = DATE_PATTERN.search(text)
+    if not match:
+        return None
+    try:
+        month = datetime.strptime(match.group("month"), "%B").month
+        return datetime(int(match.group("year")), month, int(match.group("day")))
+    except ValueError:
+        return None
 
 
-def html_text(content: str) -> str:
-    parser = TextExtractor()
-    parser.feed(content)
-    return parser.text()
+def parse_time(text: str) -> tuple[int, int] | None:
+    match = TIME_PATTERN.search(text)
+    if not match:
+        return None
+    hour = int(match.group("hour"))
+    minute = int(match.group("minute"))
+    ampm = match.group("ampm").upper()
+    if ampm == "PM" and hour != 12:
+        hour += 12
+    elif ampm == "AM" and hour == 12:
+        hour = 0
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return hour, minute
 
 
-def discover_archive_links(session, spec: dict, start_year: int, end_year: int) -> list[dict]:
-    response = session.get(spec["archive_index"], timeout=90)
-    response.raise_for_status()
-    parser = LinkCollector()
-    parser.feed(response.text)
-
-    slug = re.escape(spec["archive_slug"])
-    pattern = re.compile(rf"/news\.release/archives/{slug}_(\d{{8}})\.htm$", re.IGNORECASE)
-    discovered: dict[str, dict] = {}
-    for href, link_text in parser.links:
-        match = pattern.search(href)
-        if not match:
-            continue
-        release_date = datetime.strptime(match.group(1), "%m%d%Y").date()
-        if not (start_year <= release_date.year <= end_year):
-            continue
-        url = urljoin(BLS_BASE, href)
-        discovered[url] = {
-            "url": url,
-            "link_text": link_text,
-            "filename_release_date": release_date,
-        }
-    return sorted(discovered.values(), key=lambda item: item["filename_release_date"])
-
-
-def parse_reference_period(link_text: str) -> pd.Timestamp | pd.NaT:
-    match = re.search(rf"(?P<month>{MONTHS})\s+(?P<year>\d{{4}})", link_text, re.IGNORECASE)
+def parse_reference_period(release_text: str) -> pd.Timestamp | pd.NaT:
+    match = REFERENCE_PATTERN.search(release_text)
     if not match:
         return pd.NaT
     try:
-        parsed = datetime.strptime(f"{match.group('month')} {match.group('year')}", "%B %Y")
+        parsed = datetime.strptime(
+            f"{match.group('month')} {match.group('year')}", "%B %Y"
+        )
     except ValueError:
         return pd.NaT
     return pd.Timestamp(parsed.date(), tz="UTC")
 
 
-def parse_embargo_timestamp(text: str) -> tuple[datetime | None, str | None]:
-    marker = text.lower().find("embargoed until")
-    search_text = text[marker : marker + 700] if marker >= 0 else text[:1200]
-    match = EMBARGO_PATTERN.search(search_text)
-    if not match:
-        return None, None
-
-    hour = int(match.group("hour"))
-    minute = int(match.group("minute"))
-    ampm = re.sub(r"[^apm]", "", match.group("ampm").lower())
-    if ampm.startswith("p") and hour != 12:
-        hour += 12
-    elif ampm.startswith("a") and hour == 12:
-        hour = 0
-
-    local_dt = datetime(
-        int(match.group("year")),
-        datetime.strptime(match.group("month"), "%B").month,
-        int(match.group("day")),
-        hour,
-        minute,
-        tzinfo=NEW_YORK,
-    )
-    return local_dt, match.group("tz").upper()
+def classify_release(release_text: str) -> tuple[str, dict] | None:
+    normalized = re.sub(r"\s+", " ", release_text).strip()
+    for event_type, spec in RELEASES.items():
+        if normalized.lower().startswith(spec["release_prefix"].lower()):
+            return event_type, spec
+    return None
 
 
-def build_row(event_type: str, spec: dict, item: dict, page_text: str) -> dict:
-    local_dt, stated_tz = parse_embargo_timestamp(page_text)
-    reference_period = parse_reference_period(item["link_text"])
+def build_row(
+    *,
+    event_type: str,
+    spec: dict,
+    release_text: str,
+    release_date: datetime | None,
+    release_time: tuple[int, int] | None,
+    source_url: str,
+    calendar_year: int,
+) -> dict:
     reasons: list[str] = []
+    reference_period = parse_reference_period(release_text)
 
-    if local_dt is None:
-        reasons.append("embargo_timestamp_not_parsed")
-    else:
-        if local_dt.date() != item["filename_release_date"]:
-            reasons.append("embargo_date_disagrees_with_archive_filename")
-        actual_tz = local_dt.tzname()
-        if stated_tz in {"EST", "EDT"} and actual_tz != stated_tz:
-            reasons.append(f"stated_timezone_{stated_tz}_disagrees_with_America_New_York_{actual_tz}")
-
+    if release_date is None:
+        reasons.append("calendar_release_date_not_parsed")
+    if release_time is None:
+        reasons.append("calendar_release_time_not_parsed")
     if pd.isna(reference_period):
-        reasons.append("reference_period_not_parsed_from_archive_index")
+        reasons.append("reference_period_not_parsed")
 
-    utc_dt = local_dt.astimezone(UTC) if local_dt is not None else pd.NaT
-    local_iso = local_dt.isoformat() if local_dt is not None else None
+    local_dt = None
+    utc_dt = pd.NaT
+    if release_date is not None and release_time is not None:
+        local_dt = release_date.replace(
+            hour=release_time[0], minute=release_time[1], second=0, microsecond=0,
+            tzinfo=NEW_YORK,
+        )
+        utc_dt = local_dt.astimezone(UTC)
+        if utc_dt > datetime.now(tz=UTC):
+            reasons.append("future_scheduled_release")
+
+    if release_date is not None and release_date.year != calendar_year:
+        reasons.append("release_date_outside_calendar_year")
+
     model_eligible = not reasons
-    event_id = (
-        f"bls:{event_type}:{utc_dt.strftime('%Y%m%dT%H%MZ')}"
-        if local_dt is not None
-        else f"bls:{event_type}:unparsed:{item['filename_release_date'].isoformat()}"
-    )
+    if local_dt is not None:
+        event_id = f"bls:{event_type}:{utc_dt.strftime('%Y%m%dT%H%MZ')}"
+        local_iso = local_dt.isoformat()
+        tz_abbreviation = local_dt.tzname()
+        release_date_iso = release_date.date().isoformat()
+    else:
+        event_id = f"bls:{event_type}:unparsed:{calendar_year}:{release_text[:40]}"
+        local_iso = None
+        tz_abbreviation = None
+        release_date_iso = release_date.date().isoformat() if release_date is not None else None
 
     return {
         "event_id": event_id,
@@ -225,15 +225,61 @@ def build_row(event_type: str, spec: dict, item: dict, page_text: str) -> dict:
         "previous": np.nan,
         "revised_previous": np.nan,
         "source": "U.S. Bureau of Labor Statistics",
-        "source_url": item["url"],
-        "timestamp_source": "BLS archived release embargo line",
+        "source_url": source_url,
+        "timestamp_source": TIMESTAMP_SOURCE,
         "timestamp_precision": "minute",
-        "stated_timezone_abbreviation": stated_tz,
+        "stated_timezone_abbreviation": tz_abbreviation,
         "model_eligible": model_eligible,
         "quarantine_reason": ";".join(reasons),
-        "archive_link_text": item["link_text"],
-        "filename_release_date": item["filename_release_date"].isoformat(),
+        "calendar_release_text": release_text,
+        "calendar_release_date": release_date_iso,
+        "calendar_year": calendar_year,
     }
+
+
+def parse_schedule_page(content: str, source_url: str, calendar_year: int) -> list[dict]:
+    parser = TableRowParser()
+    parser.feed(content)
+
+    rows: list[dict] = []
+    last_date: datetime | None = None
+    last_time: tuple[int, int] | None = None
+
+    for cells in parser.rows:
+        joined = " | ".join(cells)
+        row_date = next((parse_date(cell) for cell in cells if parse_date(cell) is not None), None)
+        if row_date is not None:
+            last_date = row_date
+            last_time = None
+
+        row_time = next((parse_time(cell) for cell in cells if parse_time(cell) is not None), None)
+        if row_time is not None:
+            last_time = row_time
+
+        release_cell = None
+        classification = None
+        for cell in cells:
+            classification = classify_release(cell)
+            if classification is not None:
+                release_cell = cell
+                break
+        if classification is None or release_cell is None:
+            continue
+
+        event_type, spec = classification
+        rows.append(
+            build_row(
+                event_type=event_type,
+                spec=spec,
+                release_text=release_cell,
+                release_date=row_date or last_date,
+                release_time=row_time or last_time,
+                source_url=source_url,
+                calendar_year=calendar_year,
+            )
+        )
+
+    return rows
 
 
 def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFrame:
@@ -243,18 +289,34 @@ def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFram
 
     session = http_session()
     rows: list[dict] = []
-    for event_type, spec in RELEASES.items():
-        links = discover_archive_links(session, spec, start_year, end_year)
-        if not links:
-            raise RuntimeError(f"No BLS archive links discovered for {event_type}")
-        print(f"{event_type}: discovered {len(links):,} archived releases", flush=True)
+    for year in range(start_year, end_year + 1):
+        url = SCHEDULE_URL.format(year=year)
+        response = session.get(url, timeout=90)
+        if response.status_code == 403:
+            raise RuntimeError(
+                "BLS blocked the annual schedule request with HTTP 403. "
+                "The client is identifiable and deliberately low-volume; do not bypass the block. "
+                "Retry later or from a network that BLS permits."
+            )
+        if not response.ok:
+            raise RuntimeError(
+                f"BLS annual schedule request failed for {year} "
+                f"(HTTP {response.status_code}): {url}"
+            )
 
-        for index, item in enumerate(links, start=1):
-            response = session.get(item["url"], timeout=90)
-            response.raise_for_status()
-            rows.append(build_row(event_type, spec, item, html_text(response.text)))
-            if index % 25 == 0 or index == len(links):
-                print(f"  parsed {index:,}/{len(links):,}", flush=True)
+        year_rows = parse_schedule_page(response.text, url, year)
+        if not year_rows:
+            raise RuntimeError(f"No CPI/Employment Situation rows parsed from BLS schedule {year}")
+        rows.extend(year_rows)
+        counts = pd.Series([row["event_type"] for row in year_rows]).value_counts().to_dict()
+        print(
+            f"BLS schedule {year}: {len(year_rows):,} target events "
+            f"{counts}",
+            flush=True,
+        )
+        # One request per year is already light; keep a small delay as an extra
+        # courtesy to the public site.
+        time.sleep(0.75)
 
     frame = normalize_event_schema(pd.DataFrame(rows))
     safe = frame[frame["model_eligible"]].copy()
@@ -263,6 +325,12 @@ def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFram
     duplicate_ids = safe["event_id"].duplicated(keep=False)
     if duplicate_ids.any():
         raise RuntimeError(f"Duplicate eligible BLS event IDs: {int(duplicate_ids.sum())}")
+
+    duplicate_reference = safe.duplicated(["event_type", "reference_period"], keep=False)
+    if duplicate_reference.any():
+        raise RuntimeError(
+            f"Duplicate eligible BLS event/reference rows: {int(duplicate_reference.sum())}"
+        )
 
     atomic_parquet(safe, OUTPUT_FILE)
     if not quarantine.empty:
