@@ -89,7 +89,7 @@ def realtime_windows(start: str, end: str):
 
 def checkpoint_path(name: str, spec: dict, start: str, end: str):
     return CHECKPOINT_DIRECTORY / (
-        f"{name}_{spec['source_id']}_ot{spec['output_type']}_{spec['units']}_{start}_{end}.parquet"
+        f"{name}_{spec['source_id']}_ot{spec['output_type']}_{start}_{end}.parquet"
     )
 
 
@@ -153,8 +153,6 @@ def fetch_window(
             if observation.get("value") in {None, "."}:
                 continue
             vintage = parse_fred_date(observation.get("realtime_start"))
-            # ALFRED vintage metadata is date-granular. Delaying use until the
-            # next UTC day prevents same-day release-time look-ahead.
             available = vintage + pd.Timedelta(days=1) if pd.notna(vintage) else pd.NaT
             rows.append(
                 {
