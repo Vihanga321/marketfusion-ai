@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -19,20 +19,26 @@ ENDPOINT = "https://api.stlouisfed.org/fred/series/observations"
 OUTPUT_FILE = DATA_DIRECTORY / "fred_macro.parquet"
 FRED_KEY_PATTERN = re.compile(r"^[a-z0-9]{32}$")
 
-# ALFRED output_type=2 retains revisions. Daily market/rate observations use
-# output_type=4 (initial release) to avoid an impractically large vintage cube.
+# FRED limits JSON/XML observation requests to 2,000 vintage dates. Querying
+# 2015-present in one real-time window exceeds that limit for daily series, so
+# every series is downloaded in non-overlapping calendar-year real-time windows.
+#
+# output_type=3 keeps only new/revised observations for revision-prone macro
+# series. That is enough to reconstruct point-in-time state without downloading
+# the very large repeated vintage cube from output_type=2.
+# output_type=4 returns initial releases only and is used for daily rates/yields.
 SERIES = {
     "fed_funds_rate": {"source_id": "DFF", "frequency": "D", "units": "lin", "output_type": 4},
     "us_2y_yield": {"source_id": "DGS2", "frequency": "D", "units": "lin", "output_type": 4},
     "us_10y_yield": {"source_id": "DGS10", "frequency": "D", "units": "lin", "output_type": 4},
-    "us_cpi_yoy": {"source_id": "CPIAUCSL", "frequency": "M", "units": "pc1", "output_type": 2},
-    "us_core_cpi_yoy": {"source_id": "CPILFESL", "frequency": "M", "units": "pc1", "output_type": 2},
-    "us_pce": {"source_id": "PCEPI", "frequency": "M", "units": "pc1", "output_type": 2},
-    "us_core_pce": {"source_id": "PCEPILFE", "frequency": "M", "units": "pc1", "output_type": 2},
-    "us_unemployment": {"source_id": "UNRATE", "frequency": "M", "units": "lin", "output_type": 2},
-    "us_payroll_growth": {"source_id": "PAYEMS", "frequency": "M", "units": "chg", "output_type": 2},
-    "us_gdp_growth": {"source_id": "A191RL1Q225SBEA", "frequency": "Q", "units": "lin", "output_type": 2},
-    "us_retail_sales_yoy": {"source_id": "RSAFS", "frequency": "M", "units": "pc1", "output_type": 2},
+    "us_cpi_yoy": {"source_id": "CPIAUCSL", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_core_cpi_yoy": {"source_id": "CPILFESL", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_pce": {"source_id": "PCEPI", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_core_pce": {"source_id": "PCEPILFE", "frequency": "M", "units": "pc1", "output_type": 3},
+    "us_unemployment": {"source_id": "UNRATE", "frequency": "M", "units": "lin", "output_type": 3},
+    "us_payroll_growth": {"source_id": "PAYEMS", "frequency": "M", "units": "chg", "output_type": 3},
+    "us_gdp_growth": {"source_id": "A191RL1Q225SBEA", "frequency": "Q", "units": "lin", "output_type": 3},
+    "us_retail_sales_yoy": {"source_id": "RSAFS", "frequency": "M", "units": "pc1", "output_type": 3},
 }
 
 
@@ -52,7 +58,28 @@ def fred_api_key() -> str:
     return api_key
 
 
-def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> pd.DataFrame:
+def realtime_windows(start: str, end: str):
+    """Yield non-overlapping calendar-year real-time windows."""
+    first = date.fromisoformat(start)
+    last = date.fromisoformat(end)
+    if first > last:
+        raise ValueError("Start date must not be after end date")
+    cursor = first
+    while cursor <= last:
+        window_end = min(date(cursor.year, 12, 31), last)
+        yield cursor.isoformat(), window_end.isoformat()
+        cursor = window_end + timedelta(days=1)
+
+
+def fetch_window(
+    name: str,
+    spec: dict,
+    api_key: str,
+    observation_start: str,
+    observation_end: str,
+    realtime_start: str,
+    realtime_end: str,
+) -> list[dict]:
     session = http_session()
     rows: list[dict] = []
     offset = 0
@@ -61,10 +88,10 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
             "api_key": api_key,
             "file_type": "json",
             "series_id": spec["source_id"],
-            "observation_start": start,
-            "observation_end": end,
-            "realtime_start": start,
-            "realtime_end": end,
+            "observation_start": observation_start,
+            "observation_end": observation_end,
+            "realtime_start": realtime_start,
+            "realtime_end": realtime_end,
             "units": spec["units"],
             "output_type": spec["output_type"],
             "sort_order": "asc",
@@ -79,7 +106,8 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
             except ValueError:
                 message = "non-JSON API error response"
             raise RuntimeError(
-                f"FRED/ALFRED request failed for {name} (HTTP {response.status_code}): {message}"
+                f"FRED/ALFRED request failed for {name} "
+                f"(real-time {realtime_start}..{realtime_end}, HTTP {response.status_code}): {message}"
             )
         payload = response.json()
         observations = payload.get("observations", [])
@@ -103,12 +131,33 @@ def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> p
                     "units_transform": spec["units"],
                     "realtime_end": observation.get("realtime_end"),
                     "availability_method": "alfred_vintage_date_plus_1d",
+                    "fred_output_type": spec["output_type"],
                     "model_eligible": True,
                 }
             )
         offset += len(observations)
         if not observations or offset >= int(payload.get("count", offset)):
             break
+    return rows
+
+
+def fetch_series(name: str, spec: dict, api_key: str, start: str, end: str) -> pd.DataFrame:
+    rows: list[dict] = []
+    for realtime_start, realtime_end in realtime_windows(start, end):
+        chunk = fetch_window(
+            name,
+            spec,
+            api_key,
+            observation_start=start,
+            observation_end=end,
+            realtime_start=realtime_start,
+            realtime_end=realtime_end,
+        )
+        rows.extend(chunk)
+        print(
+            f"  {name} {realtime_start}..{realtime_end}: "
+            f"{len(chunk):,} new/revised rows"
+        )
     return pd.DataFrame(rows)
 
 
@@ -118,6 +167,8 @@ def download(start: str = "2015-01-01", end: str | None = None) -> pd.DataFrame:
     frames = []
     for name, spec in SERIES.items():
         frame = fetch_series(name, spec, api_key, start, end)
+        if frame.empty:
+            raise RuntimeError(f"FRED/ALFRED returned no usable rows for {name}")
         frames.append(frame)
         print(f"FRED/ALFRED {name}: {len(frame):,} point-in-time rows")
     result = normalize_schema(pd.concat(frames, ignore_index=True))
