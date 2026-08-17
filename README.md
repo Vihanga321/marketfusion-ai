@@ -211,6 +211,31 @@ The completed 276-event run's four MISMATCH events have a separate, read-only fo
 
 `DUKASCOPY_USER` and `DUKASCOPY_PASSWORD` must already exist in that PowerShell process. The command writes minute-level differences, first/last tick context, and an evidence-based classification to `reports/dukascopy_mismatch_minutes.tsv`, `reports/dukascopy_mismatch_tick_context.tsv`, and `reports/dukascopy_mismatch_diagnostic.txt`. Missing tick minutes are never filled or interpolated.
 
+The frozen V0.4A adjudication preserves the original result—242 PASS, 30 INCOMPLETE, four MISMATCH, and zero ERROR. The four mismatches are quarantined as provider native/tick disagreements; their forensic evidence also records five tick-history-hole minutes. There are zero demonstrated reconstruction bugs, invalid-tick-filtering causes, or minute-boundary issues. Together with the 30 incomplete events, 34 events are quarantined and only the 242 original strict PASS rows are eligible for reaction extraction.
+
+Build the adjudication, strict manifest, and read-only reaction pipeline with:
+
+```powershell
+.\scripts\run_v04a_event_reaction_pipeline.ps1
+```
+
+The runner verifies SHA-256 fingerprints for all six frozen production/forensic artifacts before and after the new stage. It never reads `.env`; credentialed collection requires `DUKASCOPY_USER` and `DUKASCOPY_PASSWORD` in the current process. Without them it completes the non-live work and records `REACTION_EXTRACTION_NOT_RUN` rather than fabricating market data. Generated provider windows live under ignored `data/dukascopy/v04a_reaction/`, are written atomically, and are reused only after their event identity, UTC bounds, contract version, source, 261-minute coverage, and SHA-256 fingerprint pass validation.
+
+Reaction timing is defined by M1 bar starts: pre-event is `T-1`; +1m is `T`; +5m is `T+4`; +15m is `T+14`; +60m is `T+59`; and +240m is `T+239`. EUR/USD uses one pip equal to `0.0001`. BID, ASK, MID, and spread are reconstructed from the same valid, ordered, exact-deduplicated ticks. MID high/low comes from actual per-tick midpoints, never averaged BID/ASK OHLC; spread geometry comes from each actual `ask-bid` observation.
+
+Spread expansion is the maximum observed post-release tick spread through the selected horizon minus the pre-event bar's closing spread. Maximum upward excursion is positive relative to the pre-event midpoint; maximum downward excursion is signed and non-positive. Continuation requires two non-FLAT cumulative directions with the same sign, reversal requires opposite non-FLAT signs, and exact zero is the deterministic FLAT case.
+
+The canonical wide schema prefixes pre-release values with `context_` and every post-release label with `outcome_`. A leakage gate rejects `outcome_` columns from pre-event feature matrices. Missing market minutes invalidate extraction: there is no interpolation, price forward fill, synthetic ASK, or assumed spread. The outputs are:
+
+- `reports/dukascopy_v04a_adjudication.tsv` and `.txt`
+- `data/processed/v04a_eligible_event_manifest.parquet`
+- `reports/v04a_eligible_event_manifest.csv` and `_summary.csv`
+- `data/processed/v04a_event_reactions.parquet` and `_long.parquet`
+- `reports/v04a_event_reaction_sample.csv`
+- `reports/v04a_event_reaction_coverage.csv`
+- `reports/v04a_event_reaction_quality.txt`
+- `reports/v04a_historical_event_memory_schema.csv`
+
 Only rows with `model_eligible_market_reaction=true` may enter a future event model. The aggregator sets that flag only for strict PASS results; INCOMPLETE, MISMATCH, and ERROR are rejected by the training gate.
 
 ## Project preflight and CI

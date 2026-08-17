@@ -1,0 +1,50 @@
+MARKETFUSION V0.4A EVENT REACTION QUALITY
+Reaction contract: v0.4a-event-reaction-v1
+Eligible strict PASS events: 242
+Reaction extraction complete: 0
+Unavailable during extraction: 0
+Data quality failures: 0
+Errors: 0
+Not run: 242
+Invalid ticks: 0
+Negative-spread ticks: 0
+Exact duplicate ticks removed: 0
+Missing reconstructed minutes: 0
+
+Horizon semantics: pre=T-1; +1=T; +5=T+4; +15=T+14; +60=T+59; +240=T+239.
+PIP_SIZE: 0.0001
+MID: reconstructed from each valid tick midpoint, never averaged BID/ASK OHLC.
+Spread: reconstructed from each actual ask-bid tick spread; no assumed spread.
+Missing minutes: rejected; no interpolation or forward filling.
+Leakage gate: context_* is pre-event; outcome_* is post-event and forbidden from feature matrices.
+Exact required horizon coverage: INCOMPLETE
+BID/ASK/MID validation: NOT_TESTED
+Spread validation: NOT_TESTED
+
+BY YEAR AND EVENT TYPE:
+- 2015 us_cpi_release: eligible=9; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=9
+- 2015 us_employment_situation: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2016 us_cpi_release: eligible=10; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=10
+- 2016 us_employment_situation: eligible=8; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=8
+- 2017 us_cpi_release: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2017 us_employment_situation: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2018 us_cpi_release: eligible=8; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=8
+- 2018 us_employment_situation: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2019 us_cpi_release: eligible=12; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=12
+- 2019 us_employment_situation: eligible=12; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=12
+- 2020 us_cpi_release: eligible=9; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=9
+- 2020 us_employment_situation: eligible=12; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=12
+- 2021 us_cpi_release: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2021 us_employment_situation: eligible=10; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=10
+- 2022 us_cpi_release: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2022 us_employment_situation: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2023 us_cpi_release: eligible=10; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=10
+- 2023 us_employment_situation: eligible=11; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=11
+- 2024 us_cpi_release: eligible=10; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=10
+- 2024 us_employment_situation: eligible=12; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=12
+- 2025 us_cpi_release: eligible=10; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=10
+- 2025 us_employment_situation: eligible=9; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=9
+- 2026 us_cpi_release: eligible=7; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=7
+- 2026 us_employment_situation: eligible=6; complete=0; unavailable=0; quality_failures=0; errors=0; not_run=6
+
+REACTION_DATASET_STATUS: REACTION_EXTRACTION_NOT_RUN

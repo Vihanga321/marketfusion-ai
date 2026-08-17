@@ -1,0 +1,15 @@
+MARKETFUSION V0.4A FINAL ADJUDICATION
+Production contract: v0.4a-native-bid-tick-rebuild-v3
+Original production statuses are preserved without relabeling.
+
+STRICT_PASS: 242
+PROVIDER_HISTORY_INCOMPLETE: 30
+PROVIDER_NATIVE_TICK_DISAGREEMENT: 4
+RECONSTRUCTION_BUG: 0
+VALIDATOR_ERROR: 0
+TRAINING_ELIGIBLE: 242
+QUARANTINED: 34
+
+MISMATCH remains MISMATCH. INCOMPLETE remains INCOMPLETE.
+No demonstrated reconstruction bug, invalid filtering, or minute-boundary issue.
+ADJUDICATION_STATUS: PASS
