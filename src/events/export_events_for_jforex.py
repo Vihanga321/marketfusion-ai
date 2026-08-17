@@ -34,7 +34,11 @@ def _iso_utc(series: pd.Series) -> pd.Series:
     return values.map(lambda value: value.isoformat().replace("+00:00", "Z"))
 
 
-def build_export(event_id: str | None = None, limit: int | None = None) -> pd.DataFrame:
+def build_export(
+    event_id: str | None = None,
+    limit: int | None = None,
+    sample_per_year: int | None = None,
+) -> pd.DataFrame:
     if not EVENT_FILE.exists():
         raise RuntimeError(f"Missing validated event file: {EVENT_FILE}")
 
@@ -67,6 +71,19 @@ def build_export(event_id: str | None = None, limit: int | None = None) -> pd.Da
 
     eligible = eligible.sort_values("event_timestamp_utc").reset_index(drop=True)
 
+    if sample_per_year is not None:
+        if sample_per_year <= 0:
+            raise RuntimeError("--sample-per-year must be greater than zero")
+        if event_id is not None:
+            raise RuntimeError("--sample-per-year cannot be combined with --event-id")
+        eligible = eligible.assign(_sample_year=eligible["event_timestamp_utc"].dt.year)
+        eligible = (
+            eligible.groupby("_sample_year", sort=True, group_keys=False)
+            .head(sample_per_year)
+            .drop(columns=["_sample_year"])
+            .reset_index(drop=True)
+        )
+
     if limit is not None:
         if limit <= 0:
             raise RuntimeError("--limit must be greater than zero")
@@ -90,10 +107,19 @@ def main() -> int:
     )
     parser.add_argument("--event-id", help="Export only one exact event_id")
     parser.add_argument("--limit", type=int, help="Export only the earliest N eligible events")
+    parser.add_argument(
+        "--sample-per-year",
+        type=int,
+        help="Deterministically export the earliest N eligible events from each calendar year",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
 
-    exported = build_export(event_id=args.event_id, limit=args.limit)
+    exported = build_export(
+        event_id=args.event_id,
+        limit=args.limit,
+        sample_per_year=args.sample_per_year,
+    )
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     exported.to_csv(output, sep="\t", index=False, encoding="utf-8")
