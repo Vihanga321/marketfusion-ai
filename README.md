@@ -1,6 +1,6 @@
 # MarketFusion AI
 
-MarketFusion AI is an experimental EUR/USD research pipeline. V0.1 is retained as a baseline because it exposed suspicious Yahoo Finance daily-candle geometry. The current primary market-data path is MetaTrader 5 (MT5); the earlier OANDA adapter is preserved as an optional/unused adapter for auditability.
+MarketFusion AI is an experimental EUR/USD research pipeline. V0.1 is retained as a baseline because it exposed suspicious Yahoo Finance daily-candle geometry. The current primary long-history/live market-data path is MetaTrader 5 (MT5); Dukascopy/JForex is used for small historical event windows where MT5 M1 coverage is insufficient. The earlier OANDA adapter is preserved as an optional/unused adapter for auditability.
 
 No result in this repository should be interpreted as a live-trading recommendation or a demonstrated predictive edge.
 
@@ -9,7 +9,7 @@ No result in this repository should be interpreted as a live-trading recommendat
 - **V0.1:** Yahoo Finance daily baseline. Preserved because validation exposed a candle-data artifact and a misleading high apparent accuracy.
 - **V0.2:** Clean MT5 historical H1/H4 price pipeline plus a read-only live EUR/USD tick collector. OANDA files are retained but are not the active data path.
 - **V0.3:** Point-in-time macroeconomic intelligence using official FRED/ALFRED and ECB data with explicit vintage/availability semantics. BLS values without historical release timestamps remain quarantined from the macro-level model.
-- **V0.4A (in progress):** exact economic-release timestamps and event provenance. The first adapter reconstructs historical BLS CPI and Employment Situation timestamps directly from official archived release embargo lines before any event-reaction modeling.
+- **V0.4A (in progress):** economic-release timestamp/provenance validation plus read-only historical EUR/USD event-window coverage. BLS direct archived-calendar access is preferred; when it is unavailable, the current fallback is explicitly labeled reconstruction from ALFRED first-vintage timing plus the official BLS 08:30 Eastern release convention. Consensus forecasts are still excluded until a trustworthy historical provider is established.
 
 ## Read-only MetaTrader 5 tick layer
 
@@ -64,6 +64,23 @@ OANDA_ACCOUNT_ID=...
 OANDA_ENV=practice
 ```
 
+Dukascopy/JForex credentials are **not** stored in `.env` by the Java collector. Load them only into the current PowerShell process when required:
+
+```powershell
+$env:DUKASCOPY_USER = Read-Host "Dukascopy demo login"
+$secret = Read-Host "Dukascopy demo password" -AsSecureString
+$cred = New-Object System.Management.Automation.PSCredential("x", $secret)
+$env:DUKASCOPY_PASSWORD = $cred.GetNetworkCredential().Password
+Remove-Variable secret,cred
+```
+
+Verify presence without printing either value:
+
+```powershell
+[bool]$env:DUKASCOPY_USER
+[bool]$env:DUKASCOPY_PASSWORD
+```
+
 ## V0.2 MT5 workflow
 
 ```powershell
@@ -115,21 +132,83 @@ Only after macro validation passes:
 
 ## V0.4A economic event timestamps
 
-V0.4A begins the Economic Surprise Engine by solving event time and provenance before adding forecasts or reaction models. For BLS releases, model-eligible timestamps come from official archived release pages and their embargo lines. `America/New_York` is used for historical Eastern-time conversion, so EST/EDT is not treated as a fixed UTC offset.
+V0.4A begins the Economic Surprise Engine by solving event time and provenance before adding forecasts or reaction models. `America/New_York` is used for historical Eastern-time conversion, so EST/EDT is not treated as a fixed UTC offset.
+
+The event adapter first attempts official BLS release-calendar/archive sources. If those sources are blocked or unavailable, `reconstruct_bls_from_alfred.py` uses a conservative fallback: first non-bootstrap ALFRED vintage dates are cross-checked across related official series and paired with the official BLS 08:30 Eastern release convention. Such rows are labeled as reconstructed rather than pretending the timestamp was directly scraped. Ambiguous or failed cross-checks are quarantined.
 
 ```powershell
 .\venv\Scripts\python.exe src\events\download_bls_release_calendar.py --start-year 2015
+.\venv\Scripts\python.exe src\events\reconstruct_bls_from_alfred.py
 .\venv\Scripts\python.exe src\events\validate_event_table.py
 ```
 
-The initial event schema includes `actual`, `forecast`, `previous`, and `revised_previous`, but V0.4A intentionally leaves consensus forecasts empty until a trustworthy historical forecast provider is established. The validator fails if forecast values appear without that provenance. Later V0.4 stages will add BEA/FOMC/ECB event sources, actual/revision fields, MT5 event-window reactions, and historical analogue retrieval.
+The initial event schema includes `actual`, `forecast`, `previous`, and `revised_previous`, but V0.4A intentionally leaves consensus forecasts empty until a trustworthy historical forecast provider is established. The validator fails if forecast values appear without that provenance. Later V0.4 stages will add BEA/FOMC/ECB event sources, actual/revision fields, reaction features, and historical analogue retrieval.
+
+### Dukascopy event-window validation
+
+MT5 M1 history is treated as an availability-limited source for old event windows. The JForex diagnostic path therefore retrieves small EUR/USD historical windows from Dukascopy. Tick reconstruction is validated against Dukascopy native BID M1 OHLC. Missing provider chunks are reported as `INCOMPLETE`; they are never interpolated or silently filled.
+
+The validation sample deliberately covers **each calendar year and each event type**:
+
+```powershell
+.\venv\Scripts\python.exe .\src\events\export_events_for_jforex.py `
+  --sample-per-year 1 `
+  --output .\data\dukascopy\tick_validation_sample.tsv
+```
+
+Compile the Java 8 JForex project and run the robust sample validator:
+
+```powershell
+cd .\jforex-event-exporter
+mvn clean compile
+mvn exec:java `
+  "-Dexec.mainClass=ai.marketfusion.jforex.TickValidationBatchRobust" `
+  "-Dexec.args=..\data\dukascopy\tick_validation_sample.tsv ..\data\dukascopy\tick_validation_robust"
+```
+
+For the complete model-eligible event set, use the batched runner. It exports all events, splits them into small deterministic batches, runs every batch, then verifies that every expected event appears exactly once in the aggregate result:
+
+```powershell
+cd C:\Users\vihan\marketfusion-ai
+.\scripts\run_jforex_full_validation.ps1
+```
+
+The final human-readable report is written to:
+
+```text
+reports/dukascopy_full_validation_summary.txt
+```
+
+Interpretation is strict:
+
+- `PASS`: complete M1 window and reconstructed BID exactly matches native BID within tolerance.
+- `INCOMPLETE`: one or more historical provider chunks were unavailable; no fabricated fill is permitted.
+- `MISMATCH`: retrieved tick reconstruction disagrees with native BID or contains an invalid spread.
+- `ERROR`: validator/process failure for the event.
+
+## Project preflight and CI
+
+A local preflight checks Python syntax, unit tests, repository secret hygiene, the read-only trading boundary, event-table validation when local data exist, and Java/Maven compilation:
+
+```powershell
+.\scripts\preflight.ps1
+```
+
+To include a credentialed Dukascopy sample run:
+
+```powershell
+.\scripts\preflight.ps1 -RunJForexSample
+```
+
+GitHub Actions also contains non-credentialed Python/safety tests and a Java 8 Maven compile job. Live Dukascopy validation intentionally remains local because credentials are never committed to GitHub.
 
 ## Security and safety
 
-- `.env`, Parquet datasets, MT5 tick files, and MT5 history are ignored by Git.
+- `.env`, Parquet datasets, Dukascopy outputs, MT5 tick files, and MT5 history are ignored by Git.
 - `.env.example` must contain placeholders only.
-- No `order_send`, trade execution, position modification, or embedded MT5 login/password code is permitted in this stage.
+- No `order_send`, JForex order execution, position modification, or embedded broker login/password code is permitted in this stage.
 - Exposed API keys or demo credentials must be rotated/revoked; removing them from the latest file is not enough if they remain valid.
+- `scripts/repo_safety_check.py` is a repository-level preflight guard, not a substitute for a dedicated secret scanner.
 
 ## Forecast timing and validation
 
