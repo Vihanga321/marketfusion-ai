@@ -203,6 +203,14 @@ Interpretation is strict:
 
 The runner is resumable but does not trust files by name alone. Each canonical result stores the event-input SHA-256, validator-source SHA-256, contract version, and configuration. Compatible PASS rows are preserved and only INCOMPLETE rows are retried. A source, input, or contract change invalidates reuse and causes a clean revalidation into a temporary attempt directory before atomic merge. MISMATCH and ERROR rows are preserved for the final failure report.
 
+The completed 276-event run's four MISMATCH events have a separate, read-only forensic path. It first proves that the production aggregate's mismatch set is still exactly the approved four IDs, runs all non-live checks, and then retrieves only those four windows. It does not alter the production validator, reconstructor, tolerance, or aggregate:
+
+```powershell
+.\scripts\run_dukascopy_mismatch_diagnostic.ps1
+```
+
+`DUKASCOPY_USER` and `DUKASCOPY_PASSWORD` must already exist in that PowerShell process. The command writes minute-level differences, first/last tick context, and an evidence-based classification to `reports/dukascopy_mismatch_minutes.tsv`, `reports/dukascopy_mismatch_tick_context.tsv`, and `reports/dukascopy_mismatch_diagnostic.txt`. Missing tick minutes are never filled or interpolated.
+
 Only rows with `model_eligible_market_reaction=true` may enter a future event model. The aggregator sets that flag only for strict PASS results; INCOMPLETE, MISMATCH, and ERROR are rejected by the training gate.
 
 ## Project preflight and CI
