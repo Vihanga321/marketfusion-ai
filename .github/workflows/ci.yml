@@ -46,6 +46,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate PowerShell runner syntax
+        shell: pwsh
+        run: |
+          $files = @('scripts/preflight.ps1', 'scripts/run_jforex_full_validation.ps1')
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed: $file"
+            }
+            Write-Host "PowerShell syntax PASS: $file"
+          }
+
       - name: Set up Java 8
         uses: actions/setup-java@v4
         with:
