@@ -1,0 +1,161 @@
+MARKETFUSION FULL LOCAL AUDIT
+========================================================================
+Repository: Vihanga321/marketfusion-ai
+Branch: main
+Audit date: 2026-08-17
+Audited implementation head: b855c347814cea2e3b2accabca99184d0e658b96
+
+A. GIT
+PASS for current worktree scope. Generated market data, Maven target output,
+virtual environment files, credentials, and JForex batch output remain ignored.
+
+B. SECURITY
+FAIL pending external remediation. Current tracked source passes the repository
+secret and read-only safety scan. No trading API is used. A high-confidence FRED
+credential literal existed in historical commit 12e60fe and was removed in
+b509fb4. Its revocation and coordinated history purge could not be verified.
+No secret value was read or printed during this audit.
+
+C. PYTHON
+PASS: compileall and pip dependency consistency checks passed.
+
+D. UNIT TESTS
+Python: 30 passed / 0 failed, including warnings-as-errors.
+Java: 5 passed / 0 failed.
+
+E. POWERSHELL
+PASS: every scripts/*.ps1 file parses successfully. The full runner invokes a
+direct child JVM, returns control between batches, uses bounded retry, and safely
+removes only the per-batch temporary attempt directory.
+
+F. JAVA 8 / MAVEN
+PASS: Oracle Java 1.8.0_501 and Maven 3.9.16; mvn clean test BUILD SUCCESS.
+
+G. EVENT TIMESTAMP INTEGRITY
+PASS: 276 eligible events, with 138 CPI and 138 Employment Situation releases,
+from 2015-01-09 through 2026-08-12. IDs are unique; timestamps are exact UTC
+minutes; 08:30 America/New_York conversion, DST abbreviation, reference-month
+lag, provenance, and monotonic release order all passed.
+
+H. LEAKAGE AUDIT
+PASS after fixes. Macro joins use available_from_utc <= decision_timestamp.
+The macro release-day feature previously exposed a release to pre-release rows
+on the same UTC date; it now becomes true only at/after public availability.
+The market-reaction training gate now rejects every non-PASS row and every PASS
+row without explicit model eligibility. Legacy Yahoo upper/lower wick features
+remain documented as leakage-like artifacts and are not used by clean MT5 models.
+
+I. JFOREX READ-ONLY SAFETY
+PASS: no IEngine import/use, getEngine, submitOrder, order_send, position
+modification, direct .bi5 scraping, or embedded credentials in current source.
+
+J. TICK -> M1 RECONSTRUCTION
+PASS for deterministic unit validation. BID and ASK use chronological
+first/max/min/last; exact duplicate quotes are removed; invalid/non-positive/
+non-finite quotes and ask < bid are counted; UTC minute boundaries and reaction
+horizon indexing are tested. Native BID tolerance remains 1e-8.
+
+K. FULL EVENT VALIDATION
+Expected under current contract: 276
+Validated under current contract: 0
+PASS: 0
+INCOMPLETE: 0
+MISMATCH: 0
+ERROR: 0
+Status: CREDENTIALLED_VALIDATION_NOT_RUN
+
+The preserved pre-fix/legacy partial evidence is not compatible with the new
+fingerprint contract and is therefore not reused: 84 events inspected across
+batches 001-007; PASS=69, INCOMPLETE=15, MISMATCH=0, ERROR=0.
+
+L. PROVIDER GAPS IN PRESERVED LEGACY PARTIAL EVIDENCE
+Count: 15
+- bls:us_cpi_release:20150116T1330Z
+- bls:us_employment_situation:20150807T1230Z
+- bls:us_cpi_release:20150819T1230Z
+- bls:us_employment_situation:20160108T1330Z
+- bls:us_employment_situation:20160205T1330Z
+- bls:us_cpi_release:20160219T1330Z
+- bls:us_employment_situation:20160304T1330Z
+- bls:us_cpi_release:20160715T1230Z
+- bls:us_employment_situation:20160805T1230Z
+- bls:us_employment_situation:20170106T1330Z
+- bls:us_cpi_release:20170714T1230Z
+- bls:us_employment_situation:20180202T1330Z
+- bls:us_cpi_release:20180214T1330Z
+- bls:us_cpi_release:20180313T1230Z
+- bls:us_cpi_release:20180411T1230Z
+
+These are legacy provider/native/tick retrieval gaps, not proven reconstruction
+defects. The new contract will emit exact missing source/window/reason/retry rows
+to reports/dukascopy_incomplete_events.tsv when credentials are available.
+
+M. FILES CHANGED
+- CI/docs: .github/workflows/ci.yml, README.md
+- Java: pom.xml, TickValidationBatchRobustV2.java,
+  TickBarReconstructor.java, TickBarReconstructorTest.java
+- Orchestration/safety: scripts/preflight.ps1,
+  scripts/run_jforex_full_validation.ps1, scripts/repo_safety_check.py
+- Event pipeline: aggregate_jforex_validation.py,
+  audit_mt5_event_m1_coverage.py, download_bls_release_calendar.py,
+  prepare_jforex_validation_batches.py, reaction_semantics.py,
+  resume_jforex_validation.py, validate_event_table.py
+- Macro pipeline: build_features_mt5_macro.py, macro/point_in_time.py,
+  macro/validate_macro_data.py
+- Tests: test_event_timestamp_validation.py,
+  test_jforex_validation_tools.py, test_macro_point_in_time.py
+- Evidence: deterministic event/macro quality reports, corrected MT5 event M1
+  coverage, macro feature manifest, and corrected 1H/4H macro walk-forward CSVs.
+
+N. BUGS FIXED
+- Removed pre-release leakage from macro_release_day.
+- Quarantined MT5 cached bars outside requested historical ranges.
+- Unified the BLS/ALFRED fallback with the conservative reconstruction rules.
+- Added exact timestamp, DST, release-lag, event-ID, and ordering validation.
+- Replaced destructive batch-root recreation with atomic, stale-safe batching.
+- Added version/hash/config fingerprinting and incomplete-only resumability.
+- Made metadata the resume transaction commit marker to prevent stale mixing.
+- Hardened aggregation against missing/duplicate/unknown events, unknown statuses,
+  malformed numerics, false PASS, and inconsistent status diagnostics.
+- Added explicit provider-gap quarantine output and strict model eligibility.
+- Extracted and unit-tested deterministic BID/ASK tick-to-M1 reconstruction.
+- Classified provider, network, empty-history, mismatch, quote, and code failures.
+- Reduced bounded provider retry waste and repetitive terminal diagnostics.
+- Replaced orphan-prone Maven execution with a synchronous direct child JVM.
+- Made validation reports deterministic and expanded preflight/CI coverage.
+- Kept the pure macro timing test independent of platform-specific dependencies.
+
+O. REMAINING LIMITATIONS
+- Dukascopy credentials were absent, so the 276-event current-contract run was
+  not executed and historical reaction coverage is not validated end to end.
+- The historical FRED credential must be confirmed revoked; repository history
+  remediation requires coordinated owner action and was not rewritten here.
+- MT5 supplies only 7 complete historical M1 event windows locally.
+- OANDA H1 and fresh MT5 tick datasets are absent; their validators correctly fail.
+- Dukascopy provider gaps may persist and must remain INCOMPLETE/quarantined.
+- Price-only and price+macro models do not establish a consistent edge.
+
+Local data/model evidence:
+- MT5 H1 PASS: 66,005 bars, 2016-01-04 00:00 to 2026-08-14 23:00 UTC.
+- MT5 H4 PASS: 16,525 bars, 2016-01-04 00:00 to 2026-08-14 20:00 UTC.
+- Macro COMPLETE PASS: 22,403 safe rows / 18 series; 557 rows quarantined.
+- MT5 event M1: 7/276 complete; 269 out-of-range cache bars quarantined.
+- 1H price XGBoost BA 0.518527 vs price+macro 0.515688
+  (delta -0.002839; macro wins 1/6 years).
+- 4H price XGBoost BA 0.508714 vs price+macro 0.507932
+  (delta -0.000783; macro wins 2/6 years).
+- 1H XGBoost calibration acceptable by the current rule; 4H not acceptable.
+
+P. GIT COMMITS
+- eeb8e56 Harden event validation and resumable JForex audit
+- b855c34 Keep macro point-in-time tests portable
+
+Q. GITHUB PUSH
+PASS: both commits pushed to origin/main. MarketFusion CI run 18 verifies the
+portable Python job and Java 8/Maven job for b855c34.
+
+R. FINAL RECOMMENDATION
+NOT READY - blockers remain. The non-credentialed code path is hardened and
+passes, but production readiness requires credential revocation confirmation and
+a complete credentialed 276-event run under validation contract
+v0.4a-native-bid-tick-rebuild-v3.
