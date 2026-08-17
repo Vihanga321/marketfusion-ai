@@ -63,6 +63,11 @@ def build_export(
         raise RuntimeError("Eligible events contain invalid event/reference timestamps")
     if eligible["event_id"].duplicated().any():
         raise RuntimeError("Eligible event table contains duplicate event_id values")
+    if eligible["event_type"].isna().any() or eligible["event_type"].astype(str).str.strip().eq("").any():
+        raise RuntimeError("Eligible events contain missing event_type values")
+
+    if sample_per_year is not None and limit is not None:
+        raise RuntimeError("--sample-per-year cannot be combined with --limit")
 
     if event_id:
         eligible = eligible[eligible["event_id"].eq(event_id)].copy()
@@ -76,11 +81,17 @@ def build_export(
             raise RuntimeError("--sample-per-year must be greater than zero")
         if event_id is not None:
             raise RuntimeError("--sample-per-year cannot be combined with --event-id")
+
+        # Validation samples must cover every event family. Grouping by year alone
+        # accidentally selected only the earliest release family (Employment in the
+        # current BLS table) and left CPI completely untested.
         eligible = eligible.assign(_sample_year=eligible["event_timestamp_utc"].dt.year)
         eligible = (
-            eligible.groupby("_sample_year", sort=True, group_keys=False)
+            eligible.sort_values(["_sample_year", "event_type", "event_timestamp_utc"])
+            .groupby(["_sample_year", "event_type"], sort=True, group_keys=False)
             .head(sample_per_year)
             .drop(columns=["_sample_year"])
+            .sort_values("event_timestamp_utc")
             .reset_index(drop=True)
         )
 
@@ -110,7 +121,7 @@ def main() -> int:
     parser.add_argument(
         "--sample-per-year",
         type=int,
-        help="Deterministically export the earliest N eligible events from each calendar year",
+        help="Export the earliest N eligible events per calendar year AND event type",
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
@@ -125,6 +136,7 @@ def main() -> int:
     exported.to_csv(output, sep="\t", index=False, encoding="utf-8")
 
     print(f"Exported events: {len(exported):,}")
+    print(f"Event types: {', '.join(sorted(exported['event_type'].astype(str).unique()))}")
     print(f"First event UTC: {exported['event_timestamp_utc'].iloc[0]}")
     print(f"Last event UTC:  {exported['event_timestamp_utc'].iloc[-1]}")
     print(f"Saved: {output}")
