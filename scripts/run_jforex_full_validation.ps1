@@ -111,12 +111,14 @@ function Invoke-JForexBatch {
         Write-Host ("--- {0} ({1}/{2}) attempt {3}/{4} ---" -f $Batch.Name, $Ordinal, $Total, $Attempt, $MaxAttempts)
         Push-Location $JForexRoot
         try {
-            # RobustV2 explicitly exits the standalone Maven JVM after JForex
-            # disconnects. This prevents SDK background threads from hanging the
-            # PowerShell batch loop after a strategy has already stopped cleanly.
-            mvn exec:java `
-                ("-Dexec.mainClass={0}" -f $ValidatorClass) `
-                ("-Dexec.args={0} {1}" -f $InputFile, $ResultDir)
+            # Use exec:exec, not exec:java. The exec goal launches a separate JVM,
+            # so JForex SDK background threads cannot keep Maven itself alive after
+            # the validator has finished. RobustV2 also calls System.exit at its
+            # standalone process boundary after disconnecting from Dukascopy.
+            $ExecArgs = "-cp %classpath $ValidatorClass `"$InputFile`" `"$ResultDir`""
+            mvn exec:exec `
+                '-Dexec.executable=java' `
+                ("-Dexec.args={0}" -f $ExecArgs)
             $MavenExit = $LASTEXITCODE
         } finally {
             Pop-Location
@@ -147,7 +149,7 @@ function Invoke-JForexBatch {
         }
 
         if (($Incomplete -gt 0) -and ($Attempt -lt $MaxAttempts)) {
-            Write-Warning "$($Batch.Name) has $Incomplete provider-incomplete event(s); retrying the whole batch once"
+            Write-Warning "$($Batch.Name) has $Incomplete provider-incomplete event(s); retrying the whole batch"
             Start-Sleep -Seconds 10
             continue
         }
