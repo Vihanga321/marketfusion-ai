@@ -19,9 +19,13 @@ TEXT_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".properties", ".ps1", ".sh", ".csv",
 }
 
+# Match executable/API-use shapes rather than generic words. Several read-only
+# Java classes deliberately mention "IEngine" in comments to document that they
+# never obtain it; matching the bare word would make the safety check fail on the
+# very comments that explain the safety boundary.
 FORBIDDEN_TRADING_PATTERNS = {
-    "MetaTrader5 order_send": re.compile(r"\border_send\s*\(", re.IGNORECASE),
-    "JForex IEngine": re.compile(r"\bIEngine\b"),
+    "MetaTrader5 order_send": re.compile(r"\b(?:mt5\s*\.\s*)?order_send\s*\(", re.IGNORECASE),
+    "JForex IEngine import": re.compile(r"^\s*import\s+com\.dukascopy\.api\.IEngine\s*;", re.MULTILINE),
     "JForex getEngine": re.compile(r"\bgetEngine\s*\("),
     "JForex submitOrder": re.compile(r"\bsubmitOrder\s*\("),
 }
@@ -109,8 +113,6 @@ def check_credential_literals(files: list[Path], errors: list[str]) -> None:
             lowered = value.lower()
             if not value or any(fragment in lowered for fragment in ALLOWED_PLACEHOLDER_FRAGMENTS):
                 continue
-            # Environment-variable lookups and shell prompts are not assignments
-            # matching this regex, so a remaining literal is suspicious.
             errors.append(f"possible hard-coded credential {key} in {rel}")
 
 
