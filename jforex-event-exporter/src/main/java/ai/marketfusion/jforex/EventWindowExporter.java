@@ -52,6 +52,8 @@ public final class EventWindowExporter {
     private static final long WINDOW_BEFORE_MS = 10L * MINUTE_MS;
     private static final long WINDOW_AFTER_MS = 250L * MINUTE_MS;
     private static final long CONNECT_TIMEOUT_SECONDS = 45L;
+    private static final int HISTORY_MAX_ATTEMPTS = 5;
+    private static final long HISTORY_RETRY_BASE_MS = 2_000L;
 
     private EventWindowExporter() {
     }
@@ -127,7 +129,15 @@ public final class EventWindowExporter {
                 throw new RuntimeException("JForex export failed", strategy.getFailure());
             }
 
-            System.out.println("EXPORT_STATUS: SUCCESS");
+            if (strategy.getMissingSideCount() == 0) {
+                System.out.println("EXPORT_STATUS: SUCCESS");
+            } else {
+                System.out.println(
+                        "EXPORT_STATUS: PARTIAL (missing event/sides="
+                                + strategy.getMissingSideCount()
+                                + ")"
+                );
+            }
         } finally {
             if (client.isConnected()) {
                 client.disconnect();
@@ -221,11 +231,24 @@ public final class EventWindowExporter {
         }
     }
 
+    private static final class LoadResult {
+        private final List<IBar> bars;
+        private final int attempts;
+        private final String error;
+
+        private LoadResult(List<IBar> bars, int attempts, String error) {
+            this.bars = bars;
+            this.attempts = attempts;
+            this.error = error;
+        }
+    }
+
     private static final class ExportStrategy implements IStrategy {
         private final List<EventRow> events;
         private final Path outputDirectory;
         private final CountDownLatch done = new CountDownLatch(1);
         private volatile Throwable failure;
+        private volatile int missingSideCount;
         private IContext context;
 
         private ExportStrategy(List<EventRow> events, Path outputDirectory) {
@@ -239,6 +262,10 @@ public final class EventWindowExporter {
 
         private Throwable getFailure() {
             return failure;
+        }
+
+        private int getMissingSideCount() {
+            return missingSideCount;
         }
 
         @Override
@@ -262,11 +289,18 @@ public final class EventWindowExporter {
             Files.createDirectories(outputDirectory);
             Path finalFile = outputDirectory.resolve("eurusd_m1_event_windows.tsv");
             Path tempFile = outputDirectory.resolve("eurusd_m1_event_windows.tmp.tsv");
+            Path finalStatusFile = outputDirectory.resolve("eurusd_m1_event_window_status.tsv");
+            Path tempStatusFile = outputDirectory.resolve("eurusd_m1_event_window_status.tmp.tsv");
 
             long rowCount = 0L;
-            try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
+            try (
+                    BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8);
+                    BufferedWriter statusWriter = Files.newBufferedWriter(tempStatusFile, StandardCharsets.UTF_8)
+            ) {
                 writer.write("event_id\tevent_type\treference_period\tevent_timestamp_utc\toffer_side\tbar_time_utc\topen\thigh\tlow\tclose\tvolume");
                 writer.newLine();
+                statusWriter.write("event_id\tevent_type\tevent_timestamp_utc\toffer_side\tattempts\tbars_returned\tstatus\terror");
+                statusWriter.newLine();
 
                 for (int i = 0; i < events.size(); i++) {
                     EventRow event = events.get(i);
@@ -275,30 +309,117 @@ public final class EventWindowExporter {
                     long to = history.getBarStart(PERIOD, eventMs + WINDOW_AFTER_MS);
 
                     for (OfferSide side : new OfferSide[]{OfferSide.BID, OfferSide.ASK}) {
-                        List<IBar> bars = history.getBars(INSTRUMENT, PERIOD, side, Filter.NO_FILTER, from, to);
-                        if (bars == null || bars.isEmpty()) {
-                            throw new JFException("No " + side + " M1 bars returned for event " + event.eventId);
+                        LoadResult result = loadBarsWithRetry(history, event, side, from, to);
+                        writeStatus(statusWriter, event, side, result);
+
+                        if (result.bars.isEmpty()) {
+                            missingSideCount++;
+                            System.err.printf(
+                                    Locale.ROOT,
+                                    "Event %d/%d %s %s MISSING after %d attempts%n",
+                                    i + 1,
+                                    events.size(),
+                                    event.eventId,
+                                    side,
+                                    result.attempts
+                            );
+                            continue;
                         }
-                        for (IBar bar : bars) {
+
+                        for (IBar bar : result.bars) {
                             writeBar(writer, event, side, bar);
                             rowCount++;
                         }
                         System.out.printf(
                                 Locale.ROOT,
-                                "Event %d/%d %s %s bars=%d%n",
+                                "Event %d/%d %s %s bars=%d attempts=%d%n",
                                 i + 1,
                                 events.size(),
                                 event.eventId,
                                 side,
-                                bars.size()
+                                result.bars.size(),
+                                result.attempts
                         );
                     }
                 }
             }
 
             moveIntoPlace(tempFile, finalFile);
+            moveIntoPlace(tempStatusFile, finalStatusFile);
             System.out.println("Rows written: " + rowCount);
+            System.out.println("Missing event/sides: " + missingSideCount);
             System.out.println("Saved: " + finalFile.toAbsolutePath());
+            System.out.println("Status: " + finalStatusFile.toAbsolutePath());
+        }
+
+        private LoadResult loadBarsWithRetry(
+                IHistory history,
+                EventRow event,
+                OfferSide side,
+                long from,
+                long to
+        ) throws InterruptedException {
+            String lastError = "no bars returned";
+
+            for (int attempt = 1; attempt <= HISTORY_MAX_ATTEMPTS; attempt++) {
+                try {
+                    List<IBar> bars = history.getBars(INSTRUMENT, PERIOD, side, Filter.NO_FILTER, from, to);
+                    if (bars != null && !bars.isEmpty()) {
+                        return new LoadResult(bars, attempt, "");
+                    }
+                    lastError = "no bars returned";
+                } catch (JFException ex) {
+                    lastError = ex.getClass().getSimpleName() + ": " + safeMessage(ex);
+                } catch (RuntimeException ex) {
+                    lastError = ex.getClass().getSimpleName() + ": " + safeMessage(ex);
+                }
+
+                if (attempt < HISTORY_MAX_ATTEMPTS) {
+                    long delayMs = HISTORY_RETRY_BASE_MS * (1L << (attempt - 1));
+                    System.err.printf(
+                            Locale.ROOT,
+                            "History load retry %d/%d for %s %s after %s; waiting %.1fs%n",
+                            attempt + 1,
+                            HISTORY_MAX_ATTEMPTS,
+                            event.eventId,
+                            side,
+                            lastError,
+                            delayMs / 1000.0
+                    );
+                    Thread.sleep(delayMs);
+                }
+            }
+
+            return new LoadResult(Collections.<IBar>emptyList(), HISTORY_MAX_ATTEMPTS, lastError);
+        }
+
+        private static String safeMessage(Throwable throwable) {
+            String message = throwable.getMessage();
+            return message == null ? throwable.toString() : message.replace('\t', ' ').replace('\r', ' ').replace('\n', ' ');
+        }
+
+        private static void writeStatus(
+                BufferedWriter writer,
+                EventRow event,
+                OfferSide side,
+                LoadResult result
+        ) throws IOException {
+            writer.write(event.eventId);
+            writer.write('\t');
+            writer.write(event.eventType);
+            writer.write('\t');
+            writer.write(event.eventTime.toString());
+            writer.write('\t');
+            writer.write(side.name());
+            writer.write('\t');
+            writer.write(Integer.toString(result.attempts));
+            writer.write('\t');
+            writer.write(Integer.toString(result.bars.size()));
+            writer.write('\t');
+            writer.write(result.bars.isEmpty() ? "missing" : "ok");
+            writer.write('\t');
+            writer.write(result.error == null ? "" : result.error.replace('\t', ' ').replace('\r', ' ').replace('\n', ' '));
+            writer.newLine();
         }
 
         private static void writeBar(BufferedWriter writer, EventRow event, OfferSide side, IBar bar)
