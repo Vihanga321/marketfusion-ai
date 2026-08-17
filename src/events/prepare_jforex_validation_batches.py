@@ -8,6 +8,7 @@ restarting the complete historical audit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -60,10 +61,6 @@ def prepare_batches(input_path: Path, output_dir: Path, batch_size: int) -> pd.D
 
     frame = _load_events(input_path)
 
-    # Start clean so a shorter rerun can never leave stale batch files that would
-    # be accidentally included in a later aggregation.
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     manifests: list[dict[str, object]] = []
@@ -75,7 +72,10 @@ def prepare_batches(input_path: Path, output_dir: Path, batch_size: int) -> pd.D
         batch_dir = output_dir / batch_id
         batch_dir.mkdir(parents=True, exist_ok=True)
         batch_file = batch_dir / "events.tsv"
-        batch[exported_columns].to_csv(batch_file, sep="\t", index=False, encoding="utf-8")
+        temporary = batch_file.with_name("events.tmp.tsv")
+        batch[exported_columns].to_csv(temporary, sep="\t", index=False, encoding="utf-8")
+        temporary.replace(batch_file)
+        batch_sha256 = hashlib.sha256(batch_file.read_bytes()).hexdigest()
 
         manifests.append(
             {
@@ -85,12 +85,25 @@ def prepare_batches(input_path: Path, output_dir: Path, batch_size: int) -> pd.D
                 "last_event_utc": batch["_event_timestamp"].iloc[-1].isoformat().replace("+00:00", "Z"),
                 "event_types": ",".join(sorted(batch["event_type"].unique())),
                 "event_file": str(batch_file.resolve()),
+                "batch_input_sha256": batch_sha256,
             }
         )
 
+    expected_batch_ids = {row["batch_id"] for row in manifests}
+    for stale in output_dir.glob("batch_*"):
+        if not stale.is_dir() or stale.name in expected_batch_ids:
+            continue
+        resolved_root = output_dir.resolve()
+        resolved_stale = stale.resolve()
+        if resolved_stale == resolved_root or resolved_root not in resolved_stale.parents:
+            raise RuntimeError(f"Refusing to remove batch outside output root: {resolved_stale}")
+        shutil.rmtree(resolved_stale)
+
     manifest = pd.DataFrame(manifests)
     manifest_file = output_dir / "batch_manifest.tsv"
-    manifest.to_csv(manifest_file, sep="\t", index=False, encoding="utf-8")
+    temporary_manifest = manifest_file.with_name("batch_manifest.tmp.tsv")
+    manifest.to_csv(temporary_manifest, sep="\t", index=False, encoding="utf-8")
+    temporary_manifest.replace(manifest_file)
 
     if int(manifest["event_count"].sum()) != len(frame):
         raise RuntimeError("Batch manifest row count does not equal source event count")

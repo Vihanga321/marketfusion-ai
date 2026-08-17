@@ -14,6 +14,11 @@ from pathlib import Path
 import MetaTrader5 as mt5
 import pandas as pd
 
+try:
+    from .reaction_semantics import pre_event_bar_open, reaction_bar_open, requested_times_only
+except ImportError:  # Support direct execution.
+    from reaction_semantics import pre_event_bar_open, reaction_bar_open, requested_times_only
+
 
 ROOT = Path(__file__).resolve().parents[2]
 EVENT_FILE = ROOT / "data" / "events" / "bls_release_events.parquet"
@@ -86,7 +91,9 @@ def audit_event(event: pd.Series) -> dict:
         "event_timestamp_utc": event_ts,
         "api_error_code": api_error[0] if isinstance(api_error, tuple) and api_error else None,
         "api_error_message": api_error[1] if isinstance(api_error, tuple) and len(api_error) > 1 else None,
+        "raw_bars_returned": 0,
         "bars_returned": 0,
+        "out_of_range_bars": 0,
         "first_bar_utc": pd.NaT,
         "last_bar_utc": pd.NaT,
         "pre_event_m1": False,
@@ -104,18 +111,32 @@ def audit_event(event: pd.Series) -> dict:
         row["api_error_message"] = "MT5 response missing time field"
         return row
 
-    times = pd.to_datetime(bars["time"], unit="s", utc=True).drop_duplicates().sort_values()
+    raw_times = pd.to_datetime(bars["time"], unit="s", utc=True).drop_duplicates().sort_values()
+    row["raw_bars_returned"] = int(len(raw_times))
+    times, out_of_range = requested_times_only(
+        raw_times,
+        event_ts - pd.Timedelta(WINDOW_BEFORE),
+        event_ts + pd.Timedelta(WINDOW_AFTER),
+    )
+    row["out_of_range_bars"] = out_of_range
+    if out_of_range:
+        row["api_error_message"] = (
+            f"MT5 returned {out_of_range} cached bar(s) outside the requested window; quarantined"
+        )
+    if times.empty:
+        row["coverage_complete"] = False
+        return row
     row["bars_returned"] = int(len(times))
     row["first_bar_utc"] = times.iloc[0]
     row["last_bar_utc"] = times.iloc[-1]
 
     # Price immediately before a minute-aligned release is represented by the M1
     # bar that opens one minute earlier and closes at the release minute.
-    row["pre_event_m1"] = _bar_point_available(times, event_ts - pd.Timedelta(minutes=1))
+    row["pre_event_m1"] = _bar_point_available(times, pre_event_bar_open(event_ts))
 
     for horizon in HORIZONS_MINUTES:
         # For a horizon H, the M1 bar opening at event+H-1m closes at event+H.
-        target_open = event_ts + pd.Timedelta(minutes=horizon - 1)
+        target_open = reaction_bar_open(event_ts, horizon)
         row[f"after_{horizon}m_m1"] = _bar_point_available(times, target_open)
 
     required = ["pre_event_m1"] + [f"after_{horizon}m_m1" for horizon in HORIZONS_MINUTES]
@@ -154,9 +175,13 @@ def run(sample_per_year: int | None = None) -> pd.DataFrame:
 
     result = pd.DataFrame(rows).sort_values("event_timestamp_utc").reset_index(drop=True)
     REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(REPORT_FILE, index=False)
+    temporary_report = REPORT_FILE.with_suffix(".tmp.csv")
+    result.to_csv(temporary_report, index=False)
+    temporary_report.replace(REPORT_FILE)
 
     complete = int(result["coverage_complete"].sum())
+    out_of_range_rows = int(result["out_of_range_bars"].gt(0).sum())
+    out_of_range_bars = int(result["out_of_range_bars"].sum())
     total = len(result)
     by_type = (
         result.groupby("event_type")["coverage_complete"]
@@ -170,6 +195,7 @@ def run(sample_per_year: int | None = None) -> pd.DataFrame:
         "=" * 72,
         f"Events audited: {total:,}",
         f"Complete M1 reaction windows: {complete:,}/{total:,} ({100.0 * complete / total:.2f}%)",
+        f"MT5 out-of-range cache responses quarantined: {out_of_range_rows:,} events / {out_of_range_bars:,} bars",
         "Required points: pre-event plus 1m, 5m, 15m, 60m, 240m post-event closes",
         "",
         "BY EVENT TYPE",
@@ -178,9 +204,12 @@ def run(sample_per_year: int | None = None) -> pd.DataFrame:
         "INTERPRETATION",
         "- This is a data-availability audit only; it does not calculate returns or claim an edge.",
         "- Incomplete windows must not be silently filled or interpolated.",
+        "- Bars outside the requested copy_rates_range interval are quarantined as MT5 cache artifacts.",
         "- If old M1 windows are unavailable from MT5, another trustworthy historical intraday source is required for short-horizon reactions.",
     ]
-    SUMMARY_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary_summary = SUMMARY_FILE.with_suffix(".tmp.txt")
+    temporary_summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary_summary.replace(SUMMARY_FILE)
 
     print(f"Complete M1 windows: {complete:,}/{total:,} ({100.0 * complete / total:.2f}%)")
     print(f"Coverage CSV: {REPORT_FILE}")

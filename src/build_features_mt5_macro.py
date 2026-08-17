@@ -89,6 +89,33 @@ def values_asof(events: pd.DataFrame, decisions: pd.Series) -> pd.DataFrame:
     ).sort_index()
 
 
+def released_today_asof(release_timestamps: list[pd.Timestamp], decisions: pd.Series) -> pd.Series:
+    """Flag a release day only after that day's first release is public.
+
+    Marking an entire UTC day from a future release timestamp would leak the
+    release into pre-release market rows. This backward as-of join keeps the
+    regime feature governed by the same availability rule as every macro value.
+    """
+    left = pd.DataFrame({"decision": pd.to_datetime(decisions, utc=True)}).sort_values("decision")
+    unique = pd.Series(pd.to_datetime(release_timestamps, utc=True)).dropna().drop_duplicates().sort_values()
+    if unique.empty:
+        return pd.Series(False, index=left.index, dtype=bool).sort_index()
+    right = pd.DataFrame({"latest_release": unique.to_numpy()})
+    joined = pd.merge_asof(
+        left,
+        right,
+        left_on="decision",
+        right_on="latest_release",
+        direction="backward",
+        allow_exact_matches=True,
+    )
+    result = (
+        joined["latest_release"].notna()
+        & joined["latest_release"].dt.normalize().eq(joined["decision"].dt.normalize())
+    )
+    return result.sort_index()
+
+
 def build_features() -> pd.DataFrame:
     result = validate(write_report=True, require_complete=True)
     if not result.passed:
@@ -145,8 +172,9 @@ def build_features() -> pd.DataFrame:
         if series_id in POLICY_CHANGE_SERIES:
             source = source[source["value"].ne(source["value"].shift())]
         release_timestamps.extend(source["available_from_utc"].dropna().tolist())
-    release_dates = pd.DatetimeIndex(release_timestamps).normalize().unique()
-    market["macro_release_day"] = market["decision_timestamp"].dt.normalize().isin(release_dates).astype("int8")
+    market["macro_release_day"] = released_today_asof(
+        release_timestamps, market["decision_timestamp"]
+    ).to_numpy(dtype="int8")
     release_fraction = float(market["macro_release_day"].mean())
     if release_fraction > 0.75:
         raise ValueError(
@@ -174,7 +202,10 @@ def build_features() -> pd.DataFrame:
         "rule": "available_from_utc <= decision_timestamp",
         "requires_complete_macro": True,
         "release_event_series": sorted(RELEASE_EVENT_SERIES),
-        "release_day_definition": "non-daily macro/policy availability day; daily yield/rate context excluded",
+        "release_day_definition": (
+            "non-daily macro/policy availability day, true only at/after the first public release; "
+            "daily yield/rate context excluded"
+        ),
     }
     REPORT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     MANIFEST_FILE.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

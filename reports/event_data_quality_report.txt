@@ -1,7 +1,7 @@
 MARKETFUSION AI V0.4A - EVENT TIMESTAMP QUALITY REPORT
 ========================================================================
-Generated UTC: 2026-08-16T17:07:12.928055+00:00
-Input: C:\Users\vihan\marketfusion-ai\data\events\bls_release_events.parquet
+Validation contract: exact UTC minute + America/New_York DST + point-in-time provenance
+Input: data\events\bls_release_events.parquet
 Eligible events: 276
 
 COVERAGE

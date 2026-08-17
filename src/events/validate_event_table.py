@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -19,6 +21,9 @@ EXPECTED_BLS_TYPES = {"us_cpi_release", "us_employment_situation"}
 DIRECT_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
 RECONSTRUCTED_TIMESTAMP_SOURCE = "ALFRED first vintage date + official BLS 08:30 Eastern release time"
 ALLOWED_TIMESTAMP_SOURCES = {DIRECT_TIMESTAMP_SOURCE, RECONSTRUCTED_TIMESTAMP_SOURCE}
+NEW_YORK = ZoneInfo("America/New_York")
+MIN_RELEASE_LAG_DAYS = 1
+MAX_RELEASE_LAG_DAYS = 25
 
 
 @dataclass
@@ -61,6 +66,26 @@ def validate(write_report: bool = True) -> ValidationResult:
                 failures.append("Eligible events contain missing/invalid reference periods")
             if eligible["event_id"].duplicated().any():
                 failures.append("Duplicate eligible event_id values detected")
+            missing_event_type = eligible["event_type"].isna() | eligible["event_type"].astype(str).str.strip().eq("")
+            if missing_event_type.any():
+                failures.append(f"{int(missing_event_type.sum())} eligible rows have missing event_type")
+
+            not_minute_aligned = (
+                eligible["event_timestamp_utc"].dt.second.ne(0)
+                | eligible["event_timestamp_utc"].dt.microsecond.ne(0)
+                | eligible["event_timestamp_utc"].dt.nanosecond.ne(0)
+            )
+            if not_minute_aligned.any():
+                failures.append(f"{int(not_minute_aligned.sum())} eligible timestamps are not exact minute boundaries")
+
+            bad_reference_start = (
+                eligible["reference_period"].dt.day.ne(1)
+                | eligible["reference_period"].dt.hour.ne(0)
+                | eligible["reference_period"].dt.minute.ne(0)
+                | eligible["reference_period"].dt.second.ne(0)
+            )
+            if bad_reference_start.any():
+                failures.append(f"{int(bad_reference_start.sum())} reference periods are not UTC month starts")
 
             duplicate_reference = eligible.duplicated(
                 ["event_type", "reference_period"], keep=False
@@ -143,6 +168,52 @@ def validate(write_report: bool = True) -> ValidationResult:
                     f"{int(bad_local.sum())} eligible rows lack a valid historical Eastern timezone abbreviation"
                 )
 
+            local_failures = 0
+            lag_failures = 0
+            id_failures = 0
+            for row in eligible.itertuples():
+                utc_timestamp = pd.Timestamp(row.event_timestamp_utc)
+                expected_local = utc_timestamp.to_pydatetime().astimezone(NEW_YORK)
+                try:
+                    parsed_local = datetime.fromisoformat(str(row.event_timestamp_local).replace("Z", "+00:00"))
+                except (TypeError, ValueError):
+                    local_failures += 1
+                    continue
+                if (
+                    parsed_local.tzinfo is None
+                    or parsed_local.astimezone(ZoneInfo("UTC")) != utc_timestamp.to_pydatetime()
+                    or parsed_local.utcoffset() != expected_local.utcoffset()
+                    or (parsed_local.hour, parsed_local.minute, parsed_local.second, parsed_local.microsecond)
+                    != (8, 30, 0, 0)
+                    or str(row.stated_timezone_abbreviation) != expected_local.tzname()
+                ):
+                    local_failures += 1
+
+                expected_suffix = utc_timestamp.strftime("%Y%m%dT%H%MZ")
+                if not str(row.event_id).endswith(expected_suffix):
+                    id_failures += 1
+
+                reference_month_end = (pd.Timestamp(row.reference_period) + pd.offsets.MonthEnd(0)).date()
+                lag_days = (expected_local.date() - reference_month_end).days
+                if not (MIN_RELEASE_LAG_DAYS <= lag_days <= MAX_RELEASE_LAG_DAYS):
+                    lag_failures += 1
+            if local_failures:
+                failures.append(f"{local_failures} eligible rows have inconsistent local/UTC/DST release timestamps")
+            if id_failures:
+                failures.append(f"{id_failures} eligible event IDs do not encode their UTC release timestamp")
+            if lag_failures:
+                failures.append(
+                    f"{lag_failures} eligible releases fall outside the {MIN_RELEASE_LAG_DAYS}.."
+                    f"{MAX_RELEASE_LAG_DAYS}-day post-reference-month window"
+                )
+
+            ordering_failures = 0
+            for _, group in eligible.sort_values("reference_period").groupby("event_type"):
+                if not group["event_timestamp_utc"].is_monotonic_increasing:
+                    ordering_failures += 1
+            if ordering_failures:
+                failures.append(f"{ordering_failures} event types have non-monotonic release ordering")
+
             represented = set(eligible["event_type"].unique())
             missing_types = sorted(EXPECTED_BLS_TYPES.difference(represented))
             if missing_types:
@@ -180,11 +251,15 @@ def validate(write_report: bool = True) -> ValidationResult:
         coverage = pd.DataFrame()
 
     passed = not failures and not eligible.empty
+    try:
+        input_display = BLS_FILE.relative_to(DATA_DIRECTORY.parents[1])
+    except ValueError:  # Unit-test/external inputs can legitimately live outside the repository.
+        input_display = BLS_FILE
     lines = [
         "MARKETFUSION AI V0.4A - EVENT TIMESTAMP QUALITY REPORT",
         "=" * 72,
-        f"Generated UTC: {pd.Timestamp.now(tz='UTC').isoformat()}",
-        f"Input: {BLS_FILE}",
+        "Validation contract: exact UTC minute + America/New_York DST + point-in-time provenance",
+        f"Input: {input_display}",
         f"Eligible events: {len(eligible):,}",
         "",
         "COVERAGE",

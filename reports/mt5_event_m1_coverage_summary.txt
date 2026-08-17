@@ -2,6 +2,7 @@ MARKETFUSION AI V0.4A - MT5 M1 EVENT WINDOW COVERAGE AUDIT
 ========================================================================
 Events audited: 276
 Complete M1 reaction windows: 7/276 (2.54%)
+MT5 out-of-range cache responses quarantined: 269 events / 269 bars
 Required points: pre-event plus 1m, 5m, 15m, 60m, 240m post-event closes
 
 BY EVENT TYPE
@@ -13,4 +14,5 @@ us_employment_situation     138         3          2.17
 INTERPRETATION
 - This is a data-availability audit only; it does not calculate returns or claim an edge.
 - Incomplete windows must not be silently filled or interpolated.
+- Bars outside the requested copy_rates_range interval are quarantined as MT5 cache artifacts.
 - If old M1 windows are unavailable from MT5, another trustworthy historical intraday source is required for short-horizon reactions.

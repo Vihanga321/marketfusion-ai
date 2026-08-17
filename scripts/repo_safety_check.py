@@ -28,6 +28,7 @@ FORBIDDEN_TRADING_PATTERNS = {
     "JForex IEngine import": re.compile(r"^\s*import\s+com\.dukascopy\.api\.IEngine\s*;", re.MULTILINE),
     "JForex getEngine": re.compile(r"\bgetEngine\s*\("),
     "JForex submitOrder": re.compile(r"\bsubmitOrder\s*\("),
+    "direct Dukascopy BI5 scraping": re.compile(r"https?://[^\s\"']+\.bi5\b", re.IGNORECASE),
 }
 
 # High-signal credential assignment forms. Horizontal whitespace is used around

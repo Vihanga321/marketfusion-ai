@@ -25,8 +25,8 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install test dependency
-        run: python -m pip install --upgrade pip "pandas>=2.2"
+      - name: Install portable test dependencies
+        run: python -m pip install --upgrade pip "pandas>=2.2" "requests>=2.31"
 
       - name: Compile Python sources
         run: python -m compileall -q src scripts tests
@@ -46,15 +46,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate PowerShell runner syntax
+      - name: Validate all PowerShell syntax
         shell: pwsh
         run: |
-          $files = @('scripts/preflight.ps1', 'scripts/run_jforex_full_validation.ps1')
+          $files = @(Get-ChildItem scripts -Filter '*.ps1' -File)
           foreach ($file in $files) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile(
-              (Resolve-Path $file),
+              $file.FullName,
               [ref]$tokens,
               [ref]$errors
             ) | Out-Null
@@ -62,7 +62,7 @@ jobs:
               $errors | ForEach-Object { Write-Error $_.Message }
               throw "PowerShell syntax validation failed: $file"
             }
-            Write-Host "PowerShell syntax PASS: $file"
+            Write-Host "PowerShell syntax PASS: $($file.Name)"
           }
 
       - name: Set up Java 8
@@ -90,5 +90,5 @@ jobs:
           java -version
           mvn -version
 
-      - name: Compile JForex exporter
-        run: mvn -B -ntp -f jforex-event-exporter/pom.xml clean compile
+      - name: Compile and test JForex exporter
+        run: mvn -B -ntp -f jforex-event-exporter/pom.xml clean test

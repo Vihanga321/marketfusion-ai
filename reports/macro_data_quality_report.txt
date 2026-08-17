@@ -1,6 +1,6 @@
 MARKETFUSION AI V0.3 - MACRO DATA QUALITY REPORT
 ====================================================================
-Generated UTC: 2026-08-16T16:26:50.784908+00:00
+Validation contract: point-in-time availability and vintage metadata
 Validation mode: COMPLETE
 Adapter files: fred_macro.parquet, ecb_macro.parquet
 Quarantine files: bls_current_values.parquet, ecb_unusable_rows.parquet

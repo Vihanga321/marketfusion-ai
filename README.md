@@ -148,6 +148,18 @@ The initial event schema includes `actual`, `forecast`, `previous`, and `revised
 
 MT5 M1 history is treated as an availability-limited source for old event windows. The JForex diagnostic path therefore retrieves small EUR/USD historical windows from Dukascopy. Tick reconstruction is validated against Dukascopy native BID M1 OHLC. Missing provider chunks are reported as `INCOMPLETE`; they are never interpolated or silently filled.
 
+MT5 may return a cached bar outside an unavailable historical `copy_rates_range` window while reporting API success. The event coverage audit now quarantines every out-of-range response before testing exact reaction timestamps. Macro regime flags follow the same point-in-time rule as macro values: a release-day flag becomes true only at or after that day's first public release, never during pre-release hours.
+
+The production validation contract is `v0.4a-native-bid-tick-rebuild-v3`:
+
+- Window: UTC M1 bars from `T-10m` through `T+250m`, inclusive (261 minutes).
+- BID and ASK reconstruction: open=first tick, high=maximum, low=minimum, close=last tick after stable timestamp ordering and exact-duplicate removal.
+- Non-finite/non-positive quotes and `ask < bid` are invalid; ASK is never manufactured from an assumed spread.
+- Native Dukascopy BID M1 is the independent reference. Complete ticks without native BID remain `NATIVE_REFERENCE_UNAVAILABLE`, not PASS.
+- The numerical BID OHLC tolerance remains `1e-8`.
+
+For a minute-aligned event at `T`, pre-event means the close of bar `T-1m`; +1m is the close of bar `T`; +5m is the close of `T+4m`; +15m, +60m, and +240m use `T+14m`, `T+59m`, and `T+239m` respectively.
+
 The validation sample deliberately covers **each calendar year and each event type**:
 
 ```powershell
@@ -177,6 +189,7 @@ The final human-readable report is written to:
 
 ```text
 reports/dukascopy_full_validation_summary.txt
+reports/dukascopy_incomplete_events.tsv
 ```
 
 Interpretation is strict:
@@ -186,9 +199,15 @@ Interpretation is strict:
 - `MISMATCH`: retrieved tick reconstruction disagrees with native BID or contains an invalid spread.
 - `ERROR`: validator/process failure for the event.
 
+`PROVIDER_UNAVAILABLE`, `NETWORK_TIMEOUT`, `HISTORY_EMPTY`, `NATIVE_REFERENCE_UNAVAILABLE`, and `TICK_HISTORY_INCOMPLETE` retain the cause of an incomplete result. The quarantine TSV records the exact event, source, missing chunk, retry count, and provider diagnostic.
+
+The runner is resumable but does not trust files by name alone. Each canonical result stores the event-input SHA-256, validator-source SHA-256, contract version, and configuration. Compatible PASS rows are preserved and only INCOMPLETE rows are retried. A source, input, or contract change invalidates reuse and causes a clean revalidation into a temporary attempt directory before atomic merge. MISMATCH and ERROR rows are preserved for the final failure report.
+
+Only rows with `model_eligible_market_reaction=true` may enter a future event model. The aggregator sets that flag only for strict PASS results; INCOMPLETE, MISMATCH, and ERROR are rejected by the training gate.
+
 ## Project preflight and CI
 
-A local preflight checks Python syntax, unit tests, repository secret hygiene, the read-only trading boundary, event-table validation when local data exist, and Java/Maven compilation:
+A local preflight checks Python syntax, unit tests, repository secret hygiene, the read-only trading boundary, all PowerShell syntax, event-table validation when local data exist, Java 8 compilation, and synthetic tick-reconstruction tests:
 
 ```powershell
 .\scripts\preflight.ps1

@@ -193,7 +193,7 @@ def validate(write_report: bool = True, require_complete: bool = False) -> Valid
     lines = [
         "MARKETFUSION AI V0.3 - MACRO DATA QUALITY REPORT",
         "=" * 68,
-        f"Generated UTC: {pd.Timestamp.now(tz='UTC').isoformat()}",
+        "Validation contract: point-in-time availability and vintage metadata",
         f"Validation mode: {'COMPLETE' if require_complete else 'SAFE_SUBSET'}",
         f"Adapter files: {', '.join(loaded) if loaded else 'none'}",
         f"Quarantine files: {', '.join(quarantine_loaded) if quarantine_loaded else 'none'}",

@@ -32,6 +32,7 @@ try:
         http_session,
         normalize_event_schema,
     )
+    from .reconstruct_bls_from_alfred import build_candidates
 except ImportError:  # Support direct execution.
     from common import (
         DATA_DIRECTORY,
@@ -40,6 +41,7 @@ except ImportError:  # Support direct execution.
         http_session,
         normalize_event_schema,
     )
+    from reconstruct_bls_from_alfred import build_candidates
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,22 +52,15 @@ NEW_YORK = ZoneInfo("America/New_York")
 UTC = ZoneInfo("UTC")
 SCHEDULE_URL = "https://www.bls.gov/schedule/{year}/"
 CALENDAR_TIMESTAMP_SOURCE = "BLS annual release calendar exact Eastern Time"
-ALFRED_TIMESTAMP_SOURCE = "ALFRED first vintage date + official BLS 08:30 Eastern release time"
 
 RELEASES = {
     "us_cpi_release": {
         "release_prefix": "Consumer Price Index for ",
         "event_name": "Consumer Price Index",
-        "alfred_series": "us_cpi_yoy",
-        "crosscheck_series": "us_core_cpi_yoy",
-        "source_series_id": "CPIAUCSL",
     },
     "us_employment_situation": {
         "release_prefix": "Employment Situation for ",
         "event_name": "Employment Situation",
-        "alfred_series": "us_payroll_growth",
-        "crosscheck_series": "us_unemployment",
-        "source_series_id": "PAYEMS",
     },
 }
 
@@ -278,19 +273,6 @@ def parse_schedule_page(content: str, source_url: str, calendar_year: int) -> li
     return rows
 
 
-def first_real_vintage(frame: pd.DataFrame, series_id: str) -> pd.DataFrame:
-    source = frame[frame["series_id"].eq(series_id)].copy()
-    if source.empty:
-        return source
-    if "availability_method" in source.columns:
-        source = source[~source["availability_method"].astype(str).str.contains("bootstrap", case=False, na=False)]
-    source["observation_period"] = pd.to_datetime(source["observation_period"], utc=True, errors="coerce")
-    source["vintage_date"] = pd.to_datetime(source["vintage_date"], utc=True, errors="coerce")
-    source = source.dropna(subset=["observation_period", "vintage_date"])
-    source = source.sort_values(["observation_period", "vintage_date"])
-    return source.drop_duplicates("observation_period", keep="first")
-
-
 def alfred_fallback(start_year: int, end_year: int) -> list[dict]:
     if not FRED_MACRO_FILE.exists():
         raise RuntimeError(
@@ -303,71 +285,18 @@ def alfred_fallback(start_year: int, end_year: int) -> list[dict]:
     if missing:
         raise RuntimeError("FRED macro fallback is missing columns: " + ", ".join(missing))
 
-    rows: list[dict] = []
-    for event_type, spec in RELEASES.items():
-        primary = first_real_vintage(macro, spec["alfred_series"])
-        crosscheck = first_real_vintage(macro, spec["crosscheck_series"])
-        if primary.empty:
-            raise RuntimeError(f"No ALFRED vintages available for {spec['alfred_series']}")
-        cross_map = dict(zip(crosscheck["observation_period"], crosscheck["vintage_date"]))
-
-        for record in primary.itertuples():
-            reference_period = record.observation_period
-            vintage = record.vintage_date
-            release_date = vintage.date()
-            if not (start_year <= release_date.year <= end_year):
-                continue
-
-            reasons: list[str] = []
-            cross_vintage = cross_map.get(reference_period)
-            if cross_vintage is None:
-                reasons.append("official_series_release_date_crosscheck_missing")
-            elif pd.Timestamp(cross_vintage).date() != release_date:
-                reasons.append("official_series_release_date_crosscheck_disagrees")
-
-            local_dt = datetime(
-                release_date.year, release_date.month, release_date.day,
-                8, 30, tzinfo=NEW_YORK,
-            )
-            utc_dt = local_dt.astimezone(UTC)
-            if utc_dt > datetime.now(tz=UTC):
-                reasons.append("future_scheduled_release")
-
-            event_id = f"bls:{event_type}:{utc_dt.strftime('%Y%m%dT%H%MZ')}"
-            rows.append({
-                "event_id": event_id,
-                "event_timestamp_utc": utc_dt,
-                "event_timestamp_local": local_dt.isoformat(),
-                "local_timezone": "America/New_York",
-                "country": "US",
-                "currency": "USD",
-                "event_type": event_type,
-                "event_name": spec["event_name"],
-                "reference_period": reference_period,
-                "actual": np.nan,
-                "forecast": np.nan,
-                "previous": np.nan,
-                "revised_previous": np.nan,
-                "source": "Federal Reserve Bank of St. Louis ALFRED + U.S. Bureau of Labor Statistics",
-                "source_url": f"https://fred.stlouisfed.org/series/{spec['source_series_id']}",
-                "timestamp_source": ALFRED_TIMESTAMP_SOURCE,
-                "timestamp_precision": "minute_reconstructed",
-                "stated_timezone_abbreviation": local_dt.tzname(),
-                "model_eligible": not reasons,
-                "quarantine_reason": ";".join(reasons),
-                "alfred_primary_series": spec["alfred_series"],
-                "alfred_crosscheck_series": spec["crosscheck_series"],
-                "alfred_first_vintage_date": release_date.isoformat(),
-                "provenance_tier": "dual_official_reconstruction",
-            })
-
-    if not rows:
+    # Use the same conservative implementation as the explicit reconstruction
+    # command. The old inline fallback omitted the release-lag and ambiguous-date
+    # quarantine rules, so its output could differ depending on which entry point
+    # happened to be used.
+    frame = build_candidates(macro, start_year, end_year)
+    if frame.empty:
         raise RuntimeError("ALFRED fallback produced no candidate BLS events")
     print(
         "BLS calendar access is blocked; using labeled dual-official ALFRED/BLS timestamp reconstruction.",
         flush=True,
     )
-    return rows
+    return frame.to_dict("records")
 
 
 def download(start_year: int = 2015, end_year: int | None = None) -> pd.DataFrame:

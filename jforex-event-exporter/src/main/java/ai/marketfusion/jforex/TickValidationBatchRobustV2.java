@@ -27,9 +27,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,6 +49,7 @@ import java.util.concurrent.TimeUnit;
  * No IEngine, order, or position-management API is used.
  */
 public final class TickValidationBatchRobustV2 {
+    private static final String VALIDATOR_VERSION = "v0.4a-native-bid-tick-rebuild-v3";
     private static final String DEMO_JNLP = "http://platform.dukascopy.com/demo_3/jforex_3.jnlp";
     private static final String USER_ENV = "DUKASCOPY_USER";
     private static final String PASSWORD_ENV = "DUKASCOPY_PASSWORD";
@@ -60,7 +63,7 @@ public final class TickValidationBatchRobustV2 {
     private static final long RUN_TIMEOUT_MINUTES = 40L;
     private static final double PRICE_TOLERANCE = 1.0e-8;
     private static final int NATIVE_FULL_ATTEMPTS = 2;
-    private static final int CHUNK_ATTEMPTS = 5;
+    private static final int CHUNK_ATTEMPTS = 3;
     private static final long RETRY_BASE_MS = 2_000L;
 
     private TickValidationBatchRobustV2() {
@@ -176,6 +179,7 @@ public final class TickValidationBatchRobustV2 {
         }
 
         List<EventRow> rows = new ArrayList<EventRow>();
+        Set<String> eventIds = new HashSet<String>();
         try (BufferedReader reader = Files.newBufferedReader(input, StandardCharsets.UTF_8)) {
             String headerLine = reader.readLine();
             if (headerLine == null) {
@@ -200,11 +204,19 @@ public final class TickValidationBatchRobustV2 {
                 }
                 String[] values = line.split("\\t", -1);
                 try {
+                    String eventId = value(values, index, "event_id");
+                    Instant eventTime = Instant.parse(value(values, index, "event_timestamp_utc"));
+                    if (!eventIds.add(eventId)) {
+                        throw new IllegalArgumentException("Duplicate event_id: " + eventId);
+                    }
+                    if (eventTime.toEpochMilli() % MINUTE_MS != 0L) {
+                        throw new IllegalArgumentException("Event timestamp is not minute-aligned: " + eventId);
+                    }
                     rows.add(new EventRow(
-                            value(values, index, "event_id"),
+                            eventId,
                             value(values, index, "event_type"),
                             value(values, index, "reference_period"),
-                            Instant.parse(value(values, index, "event_timestamp_utc"))
+                            eventTime
                     ));
                 } catch (RuntimeException ex) {
                     throw new IOException("Invalid event TSV at line " + lineNumber + ": " + ex.getMessage(), ex);
@@ -246,35 +258,6 @@ public final class TickValidationBatchRobustV2 {
         }
     }
 
-    private static final class MinuteBar {
-        private int tickCount;
-        private double bidOpen;
-        private double bidHigh;
-        private double bidLow;
-        private double bidClose;
-        private double askOpen;
-        private double askHigh;
-        private double askLow;
-        private double askClose;
-
-        private void add(ITick tick) {
-            double bid = tick.getBid();
-            double ask = tick.getAsk();
-            if (tickCount == 0) {
-                bidOpen = bidHigh = bidLow = bidClose = bid;
-                askOpen = askHigh = askLow = askClose = ask;
-            } else {
-                bidHigh = Math.max(bidHigh, bid);
-                bidLow = Math.min(bidLow, bid);
-                bidClose = bid;
-                askHigh = Math.max(askHigh, ask);
-                askLow = Math.min(askLow, ask);
-                askClose = ask;
-            }
-            tickCount++;
-        }
-    }
-
     private static final class ChunkResult<T> {
         private final long from;
         private final long to;
@@ -282,14 +265,16 @@ public final class TickValidationBatchRobustV2 {
         private final List<T> values;
         private final String error;
         private final String kind;
+        private final String reason;
 
-        private ChunkResult(long from, long to, int attempts, List<T> values, String error, String kind) {
+        private ChunkResult(long from, long to, int attempts, List<T> values, String error, String kind, String reason) {
             this.from = from;
             this.to = to;
             this.attempts = attempts;
             this.values = values;
             this.error = error;
             this.kind = kind;
+            this.reason = reason;
         }
     }
 
@@ -315,10 +300,15 @@ public final class TickValidationBatchRobustV2 {
         private final int mismatchedMinutes;
         private final int missingMinutes;
         private final int invalidSpreadTicks;
+        private final int invalidQuoteTicks;
+        private final int duplicateTicks;
+        private final int nativeMissingChunks;
+        private final int tickMissingChunks;
         private final int missingChunks;
         private final double maxDiff;
         private final String status;
         private final String error;
+        private final String failureReason;
 
         private ValidationResult(
                 EventRow event,
@@ -330,10 +320,15 @@ public final class TickValidationBatchRobustV2 {
                 int mismatchedMinutes,
                 int missingMinutes,
                 int invalidSpreadTicks,
+                int invalidQuoteTicks,
+                int duplicateTicks,
+                int nativeMissingChunks,
+                int tickMissingChunks,
                 int missingChunks,
                 double maxDiff,
                 String status,
-                String error
+                String error,
+                String failureReason
         ) {
             this.event = event;
             this.expectedMinutes = expectedMinutes;
@@ -344,10 +339,15 @@ public final class TickValidationBatchRobustV2 {
             this.mismatchedMinutes = mismatchedMinutes;
             this.missingMinutes = missingMinutes;
             this.invalidSpreadTicks = invalidSpreadTicks;
+            this.invalidQuoteTicks = invalidQuoteTicks;
+            this.duplicateTicks = duplicateTicks;
+            this.nativeMissingChunks = nativeMissingChunks;
+            this.tickMissingChunks = tickMissingChunks;
             this.missingChunks = missingChunks;
             this.maxDiff = maxDiff;
             this.status = status;
             this.error = error;
+            this.failureReason = failureReason;
         }
     }
 
@@ -407,9 +407,11 @@ public final class TickValidationBatchRobustV2 {
             ) {
                 summary.write("event_id\tevent_timestamp_utc\texpected_minutes\tnative_bid_bars\thistorical_ticks"
                         + "\trebuilt_minutes\tmatched_minutes\tmismatched_minutes\tmissing_minutes"
-                        + "\tinvalid_spread_ticks\tmissing_chunks\tmax_abs_ohlc_diff\tstatus\terror");
+                        + "\tinvalid_spread_ticks\tinvalid_quote_ticks\tduplicate_ticks"
+                        + "\tnative_missing_chunks\ttick_missing_chunks\tmissing_chunks"
+                        + "\tmax_abs_ohlc_diff\tstatus\tfailure_reason\tvalidator_version\terror");
                 summary.newLine();
-                chunks.write("event_id\tdata_kind\tchunk_from_utc\tchunk_to_utc\tattempts\trows\tstatus\terror");
+                chunks.write("event_id\tdata_kind\tchunk_from_utc\tchunk_to_utc\tattempts\trows\tstatus\treason\terror");
                 chunks.newLine();
 
                 for (int i = 0; i < events.size(); i++) {
@@ -420,7 +422,11 @@ public final class TickValidationBatchRobustV2 {
                     try {
                         result = validateEvent(history, event, chunks);
                     } catch (Throwable ex) {
-                        result = new ValidationResult(event, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, "ERROR", safeMessage(ex));
+                        result = new ValidationResult(
+                                event, 261, 0, 0, 0, 0, 0, 261,
+                                0, 0, 0, 0, 0, 0, 0.0,
+                                "ERROR", safeMessage(ex), "CODE_ERROR"
+                        );
                     }
 
                     writeSummary(summary, result);
@@ -492,23 +498,16 @@ public final class TickValidationBatchRobustV2 {
                 cursor = chunkTo + 1L;
             }
 
-            TreeMap<Long, MinuteBar> rebuilt = new TreeMap<Long, MinuteBar>();
-            int invalidSpreadTicks = 0;
+            List<TickBarReconstructor.Quote> quotes = new ArrayList<TickBarReconstructor.Quote>(allTicks.size());
+            long sequence = 0L;
             for (ITick tick : allTicks) {
-                if (tick.getAsk() < tick.getBid()) {
-                    invalidSpreadTicks++;
-                }
-                long minute = (tick.getTime() / MINUTE_MS) * MINUTE_MS;
-                if (minute < from || minute > lastBarStart) {
-                    continue;
-                }
-                MinuteBar bar = rebuilt.get(minute);
-                if (bar == null) {
-                    bar = new MinuteBar();
-                    rebuilt.put(minute, bar);
-                }
-                bar.add(tick);
+                quotes.add(new TickBarReconstructor.Quote(
+                        tick.getTime(), tick.getBid(), tick.getAsk(), sequence++
+                ));
             }
+            TickBarReconstructor.Result reconstruction = TickBarReconstructor.rebuild(quotes, from, lastBarStart);
+            TreeMap<Long, TickBarReconstructor.MinuteBar> rebuilt = reconstruction.bars;
+            int invalidSpreadTicks = reconstruction.negativeSpreadTicks;
 
             int matched = 0;
             int mismatched = 0;
@@ -517,7 +516,7 @@ public final class TickValidationBatchRobustV2 {
 
             for (long minute = from; minute <= lastBarStart; minute += MINUTE_MS) {
                 IBar nativeBar = nativeLoad.bars.get(minute);
-                MinuteBar rebuiltBar = rebuilt.get(minute);
+                TickBarReconstructor.MinuteBar rebuiltBar = rebuilt.get(minute);
                 if (nativeBar == null || rebuiltBar == null) {
                     missingMinutes++;
                     continue;
@@ -539,9 +538,11 @@ public final class TickValidationBatchRobustV2 {
             int missingChunks = nativeLoad.missingChunks + missingTickChunks;
             String eventStatus;
             String error = "";
-            if (mismatched > 0 || invalidSpreadTicks > 0) {
+            String failureReason = "";
+            if (mismatched > 0 || reconstruction.invalidQuoteTicks > 0) {
                 eventStatus = "MISMATCH";
-                error = "retrieved data disagree with native BID or contain invalid spreads";
+                failureReason = mismatched > 0 ? "DATA_MISMATCH" : "INVALID_SPREAD_OR_QUOTE";
+                error = "retrieved data disagree with native BID or contain invalid quotes/spreads";
             } else if (
                     missingChunks > 0
                             || nativeLoad.bars.size() != expectedMinutes
@@ -549,6 +550,11 @@ public final class TickValidationBatchRobustV2 {
                             || missingMinutes > 0
             ) {
                 eventStatus = "INCOMPLETE";
+                boolean nativeIncomplete = nativeLoad.bars.size() != expectedMinutes || nativeLoad.missingChunks > 0;
+                boolean ticksIncomplete = rebuilt.size() != expectedMinutes || missingTickChunks > 0;
+                failureReason = nativeIncomplete && ticksIncomplete
+                        ? "NATIVE_AND_TICK_HISTORY_INCOMPLETE"
+                        : (nativeIncomplete ? "NATIVE_REFERENCE_UNAVAILABLE" : "TICK_HISTORY_INCOMPLETE");
                 error = "provider retrieval incomplete; nativeMissingChunks=" + nativeLoad.missingChunks
                         + "; tickMissingChunks=" + missingTickChunks;
                 if (!nativeLoad.error.isEmpty()) {
@@ -558,6 +564,7 @@ public final class TickValidationBatchRobustV2 {
                 eventStatus = "PASS";
             } else {
                 eventStatus = "INCOMPLETE";
+                failureReason = "PROVIDER_UNAVAILABLE";
                 error = "validation coverage incomplete";
             }
 
@@ -571,10 +578,15 @@ public final class TickValidationBatchRobustV2 {
                     mismatched,
                     missingMinutes,
                     invalidSpreadTicks,
+                    reconstruction.invalidQuoteTicks,
+                    reconstruction.duplicateTicks,
+                    nativeLoad.missingChunks,
+                    missingTickChunks,
                     missingChunks,
                     maxDiff,
                     eventStatus,
-                    error
+                    error,
+                    failureReason
             );
         }
 
@@ -641,7 +653,7 @@ public final class TickValidationBatchRobustV2 {
                             INSTRUMENT, PERIOD, OfferSide.BID, Filter.NO_FILTER, from, to
                     );
                     if (bars != null && !bars.isEmpty()) {
-                        return new ChunkResult<IBar>(from, to, attempt, bars, "", "native_bid_m1");
+                        return new ChunkResult<IBar>(from, to, attempt, bars, "", "native_bid_m1", "");
                     }
                     lastError = "no native BID bars returned";
                 } catch (JFException ex) {
@@ -649,12 +661,15 @@ public final class TickValidationBatchRobustV2 {
                 } catch (RuntimeException ex) {
                     lastError = safeMessage(ex);
                 }
-                System.err.println("Native BID chunk attempt " + attempt + "/" + CHUNK_ATTEMPTS + " failed for "
-                        + event.eventId + " " + Instant.ofEpochMilli(from) + " -> " + Instant.ofEpochMilli(to)
-                        + ": " + lastError);
                 sleepBeforeRetry(attempt, CHUNK_ATTEMPTS);
             }
-            return new ChunkResult<IBar>(from, to, CHUNK_ATTEMPTS, Collections.<IBar>emptyList(), lastError, "native_bid_m1");
+            String reason = classifyProviderFailure(lastError);
+            System.err.println("Native BID chunk unavailable after " + CHUNK_ATTEMPTS + " attempts for "
+                    + event.eventId + " " + Instant.ofEpochMilli(from) + " -> " + Instant.ofEpochMilli(to)
+                    + " [" + reason + "]: " + lastError);
+            return new ChunkResult<IBar>(
+                    from, to, CHUNK_ATTEMPTS, Collections.<IBar>emptyList(), lastError, "native_bid_m1", reason
+            );
         }
 
         private ChunkResult<ITick> loadTickChunk(IHistory history, long from, long to, EventRow event)
@@ -664,7 +679,7 @@ public final class TickValidationBatchRobustV2 {
                 try {
                     List<ITick> ticks = history.getTicks(INSTRUMENT, from, to);
                     if (ticks != null && !ticks.isEmpty()) {
-                        return new ChunkResult<ITick>(from, to, attempt, ticks, "", "ticks");
+                        return new ChunkResult<ITick>(from, to, attempt, ticks, "", "ticks", "");
                     }
                     lastError = "no ticks returned";
                 } catch (JFException ex) {
@@ -672,12 +687,15 @@ public final class TickValidationBatchRobustV2 {
                 } catch (RuntimeException ex) {
                     lastError = safeMessage(ex);
                 }
-                System.err.println("Tick chunk attempt " + attempt + "/" + CHUNK_ATTEMPTS + " failed for "
-                        + event.eventId + " " + Instant.ofEpochMilli(from) + " -> " + Instant.ofEpochMilli(to)
-                        + ": " + lastError);
                 sleepBeforeRetry(attempt, CHUNK_ATTEMPTS);
             }
-            return new ChunkResult<ITick>(from, to, CHUNK_ATTEMPTS, Collections.<ITick>emptyList(), lastError, "ticks");
+            String reason = classifyProviderFailure(lastError);
+            System.err.println("Tick chunk unavailable after " + CHUNK_ATTEMPTS + " attempts for "
+                    + event.eventId + " " + Instant.ofEpochMilli(from) + " -> " + Instant.ofEpochMilli(to)
+                    + " [" + reason + "]: " + lastError);
+            return new ChunkResult<ITick>(
+                    from, to, CHUNK_ATTEMPTS, Collections.<ITick>emptyList(), lastError, "ticks", reason
+            );
         }
 
         private TreeMap<Long, IBar> toBarMap(List<IBar> bars, long from, long to) {
@@ -717,6 +735,7 @@ public final class TickValidationBatchRobustV2 {
             writer.write(Integer.toString(attempts)); writer.write('\t');
             writer.write(Integer.toString(rows)); writer.write('\t');
             writer.write(status); writer.write('\t');
+            writer.write(status.equals("OK") ? "" : classifyProviderFailure(error)); writer.write('\t');
             writer.write(safeText(error));
             writer.newLine();
             writer.flush();
@@ -733,9 +752,15 @@ public final class TickValidationBatchRobustV2 {
             writer.write(Integer.toString(result.mismatchedMinutes)); writer.write('\t');
             writer.write(Integer.toString(result.missingMinutes)); writer.write('\t');
             writer.write(Integer.toString(result.invalidSpreadTicks)); writer.write('\t');
+            writer.write(Integer.toString(result.invalidQuoteTicks)); writer.write('\t');
+            writer.write(Integer.toString(result.duplicateTicks)); writer.write('\t');
+            writer.write(Integer.toString(result.nativeMissingChunks)); writer.write('\t');
+            writer.write(Integer.toString(result.tickMissingChunks)); writer.write('\t');
             writer.write(Integer.toString(result.missingChunks)); writer.write('\t');
             writer.write(Double.toString(result.maxDiff)); writer.write('\t');
             writer.write(result.status); writer.write('\t');
+            writer.write(result.failureReason); writer.write('\t');
+            writer.write(VALIDATOR_VERSION); writer.write('\t');
             writer.write(safeText(result.error));
             writer.newLine();
             writer.flush();
@@ -749,6 +774,7 @@ public final class TickValidationBatchRobustV2 {
             writer.write(Integer.toString(chunk.attempts)); writer.write('\t');
             writer.write(Integer.toString(chunk.values.size())); writer.write('\t');
             writer.write(chunk.values.isEmpty() ? "MISSING" : "OK"); writer.write('\t');
+            writer.write(chunk.reason); writer.write('\t');
             writer.write(safeText(chunk.error));
             writer.newLine();
             writer.flush();
@@ -782,6 +808,21 @@ public final class TickValidationBatchRobustV2 {
 
     private static double max4(double a, double b, double c, double d) {
         return Math.max(Math.max(a, b), Math.max(c, d));
+    }
+
+    private static String classifyProviderFailure(String message) {
+        String lowered = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        if (lowered.contains("timed out") || lowered.contains("timeout")) {
+            return "NETWORK_TIMEOUT";
+        }
+        if (lowered.contains("503") || lowered.contains("service unavailable")
+                || lowered.contains("datacache") || lowered.contains("failed to load")) {
+            return "PROVIDER_UNAVAILABLE";
+        }
+        if (lowered.contains("no ticks") || lowered.contains("no native") || lowered.contains("no bars")) {
+            return "HISTORY_EMPTY";
+        }
+        return "PROVIDER_UNAVAILABLE";
     }
 
     private static String safeMessage(Throwable throwable) {

@@ -122,5 +122,5 @@
     "us_retail_sales_yoy",
     "us_unemployment"
   ],
-  "release_day_definition": "non-daily macro/policy availability day; daily yield/rate context excluded"
+  "release_day_definition": "non-daily macro/policy availability day, true only at/after the first public release; daily yield/rate context excluded"
 }
