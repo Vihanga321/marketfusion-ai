@@ -30,12 +30,12 @@ FORBIDDEN_TRADING_PATTERNS = {
     "JForex submitOrder": re.compile(r"\bsubmitOrder\s*\("),
 }
 
-# These are high-signal credential assignment forms. Documentation placeholders
-# are explicitly allowed below; the checker does not attempt to be a general
-# secret scanner.
+# High-signal credential assignment forms. Horizontal whitespace is used around
+# '=' deliberately: '\\s*' would cross a newline after an empty value such as
+# BLS_API_KEY= and incorrectly consume the next Markdown/code-fence line.
 CREDENTIAL_ASSIGNMENT = re.compile(
-    r"(?im)^\s*(FRED_API_KEY|BLS_API_KEY|OANDA_API_TOKEN|OANDA_ACCOUNT_ID|"
-    r"DUKASCOPY_USER|DUKASCOPY_PASSWORD)\s*=\s*([^\s#]+)\s*$"
+    r"(?im)^[ \t]*(FRED_API_KEY|BLS_API_KEY|OANDA_API_TOKEN|OANDA_ACCOUNT_ID|"
+    r"DUKASCOPY_USER|DUKASCOPY_PASSWORD)[ \t]*=[ \t]*([^#\r\n]*)[ \t]*$"
 )
 ALLOWED_PLACEHOLDER_FRAGMENTS = (
     "replace_with_",
@@ -109,7 +109,8 @@ def check_credential_literals(files: list[Path], errors: list[str]) -> None:
             continue
         rel = path.relative_to(ROOT).as_posix()
         for match in CREDENTIAL_ASSIGNMENT.finditer(text):
-            key, value = match.group(1), match.group(2).strip("'\"")
+            key = match.group(1)
+            value = match.group(2).strip().strip("'\"")
             lowered = value.lower()
             if not value or any(fragment in lowered for fragment in ALLOWED_PLACEHOLDER_FRAGMENTS):
                 continue
