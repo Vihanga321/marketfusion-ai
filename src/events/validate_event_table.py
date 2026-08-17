@@ -74,10 +74,18 @@ def validate(write_report: bool = True) -> ValidationResult:
             if future.any():
                 failures.append(f"{int(future.sum())} eligible events have future timestamps")
 
-            before_reference = (
-                eligible["event_timestamp_utc"].dt.to_period("M").astype(str)
-                < eligible["reference_period"].dt.to_period("M").astype(str)
+            # Compare year-month ordinals directly. Using .dt.to_period("M") on
+            # timezone-aware timestamps emits a warning because pandas drops the
+            # timezone even though only the calendar month is needed here.
+            release_month = (
+                eligible["event_timestamp_utc"].dt.year * 12
+                + eligible["event_timestamp_utc"].dt.month
             )
+            reference_month = (
+                eligible["reference_period"].dt.year * 12
+                + eligible["reference_period"].dt.month
+            )
+            before_reference = release_month < reference_month
             if before_reference.any():
                 failures.append(
                     f"{int(before_reference.sum())} releases occur before their reference month"
