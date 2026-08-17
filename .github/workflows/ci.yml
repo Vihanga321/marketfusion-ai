@@ -1,0 +1,72 @@
+name: MarketFusion CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-quality:
+    name: Python syntax, tests, and safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install test dependency
+        run: python -m pip install --upgrade pip "pandas>=2.2"
+
+      - name: Compile Python sources
+        run: python -m compileall -q src scripts tests
+
+      - name: Repository safety preflight
+        run: python scripts/repo_safety_check.py
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+  jforex-build:
+    name: JForex Java 8 compile
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+          cache: maven
+
+      - name: Provide compile-only JNLP API placeholder when WebStart is absent
+        shell: pwsh
+        run: |
+          $line = (& java -XshowSettings:properties -version 2>&1 | Select-String 'java.home =').ToString()
+          $javaHome = ($line -split '=', 2)[1].Trim()
+          $javaws = Join-Path $javaHome 'lib\javaws.jar'
+          if (-not (Test-Path $javaws)) {
+            $empty = Join-Path $env:RUNNER_TEMP 'empty-jnlp'
+            New-Item -ItemType Directory -Force -Path $empty | Out-Null
+            New-Item -ItemType Directory -Force -Path (Split-Path $javaws) | Out-Null
+            & jar cf $javaws -C $empty .
+            Write-Host "Created compile-only placeholder at $javaws"
+          } else {
+            Write-Host "JDK already provides $javaws"
+          }
+          java -version
+          mvn -version
+
+      - name: Compile JForex exporter
+        run: mvn -B -ntp -f jforex-event-exporter/pom.xml clean compile
