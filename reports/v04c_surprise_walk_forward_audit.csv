@@ -1,0 +1,6 @@
+horizon,eligible_query_count,event_type,time_span_start,time_span_end,surprise_analogue_directional_hit_rate,v04b_context_only_directional_hit_rate,same_event_type_unconditional_hit_rate,recent_n_hit_rate,audit_status,reason
+1m,0,ALL,2015-01-09 13:30:00+00:00,2026-08-12 12:30:00+00:00,,,,,INSUFFICIENT_SAMPLE,No audited historical pre-release consensus values
+5m,0,ALL,2015-01-09 13:30:00+00:00,2026-08-12 12:30:00+00:00,,,,,INSUFFICIENT_SAMPLE,No audited historical pre-release consensus values
+15m,0,ALL,2015-01-09 13:30:00+00:00,2026-08-12 12:30:00+00:00,,,,,INSUFFICIENT_SAMPLE,No audited historical pre-release consensus values
+60m,0,ALL,2015-01-09 13:30:00+00:00,2026-08-12 12:30:00+00:00,,,,,INSUFFICIENT_SAMPLE,No audited historical pre-release consensus values
+240m,0,ALL,2015-01-09 13:30:00+00:00,2026-08-12 12:30:00+00:00,,,,,INSUFFICIENT_SAMPLE,No audited historical pre-release consensus values

@@ -1,0 +1,34 @@
+MARKETFUSION V0.4C EVENT VALUES QUALITY
+source_v04b_sha256: 6A6439D2BA8D317BFCE3989296F4039C1A0EC02F705153EEDD6D76F34E98708C
+event_value_contract: v0.4c-event-values-v1
+events: 242
+rows: 484
+measures: 4
+cpi_rows: 236
+employment_rows: 248
+actual_values: 484
+previous_values: 480
+release_time_revisions: 129
+prior_period_values_first_released_at_T: 1
+normalized_revision_component_rows: 1385
+revision_components: 1384
+prior_period_component_first_releases: 1
+consensus_values: 0
+raw_surprises: 0
+normalized_surprises: 0
+point_in_time_violations: 0
+revision_chronology_violations: 0
+post_release_consensus_violations: 0
+unit_mismatches: 0
+ambiguous_reference_periods: 0
+
+SOURCE INTERPRETATION
+- Actuals are official BLS series values preserved in ALFRED real-time vintages.
+- Same-day ALFRED vintage dates are refined to the already-validated BLS release timestamp T.
+- The original conservative next-day macro availability is retained as source_date_availability_utc.
+- Prior values use only rows available strictly before T; same-release revisions remain separate.
+- CPI values are point-in-time SA year-over-year transforms, not claimed as exact NSA press-table fields.
+- Historical consensus has no audited provider and remains NULL/UNAVAILABLE.
+
+SURPRISE_RESEARCH_STATUS: INSUFFICIENT_SAMPLE
+EVENT_VALUE_QUALITY_STATUS: PASS

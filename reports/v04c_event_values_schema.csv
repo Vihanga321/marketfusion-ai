@@ -1,0 +1,50 @@
+column,dtype,logical_group,availability_semantics
+event_id,str,identity,scheduled release/normalized measure identity
+event_timestamp_utc,"datetime64[us, UTC]",identity,scheduled release/normalized measure identity
+event_type,str,identity,scheduled release/normalized measure identity
+measure_id,str,identity,scheduled release/normalized measure identity
+measure_name,str,identity,scheduled release/normalized measure identity
+unit,str,identity,scheduled release/normalized measure identity
+frequency,str,identity,scheduled release/normalized measure identity
+reference_period,"datetime64[us, UTC]",identity,scheduled release/normalized measure identity
+actual_value,float64,release_payload,available at official release T; POST_RELEASE_IMMEDIATE only
+previous_value_pre_release,float64,pre_release_or_revision,pre-release value is <T; revised-at-release value is T
+previous_value_revised_at_release,float64,pre_release_or_revision,pre-release value is <T; revised-at-release value is T
+consensus_value,float64,pre_release_context,must be strictly before T; unavailable in current audited source
+actual_available_from_utc,"datetime64[us, UTC]",release_payload,available at official release T; POST_RELEASE_IMMEDIATE only
+previous_available_from_utc,"datetime64[us, UTC]",pre_release_or_revision,pre-release value is <T; revised-at-release value is T
+revision_available_from_utc,"datetime64[us, UTC]",release_payload,revision published at T; never overwrites prior value
+prior_period_newly_released_at_release,float64,release_payload,older period first published at T; not classified as a revision
+prior_period_new_release_available_from_utc,"datetime64[us, UTC]",release_payload,older period first published at T; not classified as a revision
+consensus_available_from_utc,datetime64[s],pre_release_context,must be strictly before T; unavailable in current audited source
+source,str,provenance_status,audit metadata; not an analogue outcome
+source_authority,str,provenance_status,audit metadata; not an analogue outcome
+source_record_id,str,provenance_status,audit metadata; not an analogue outcome
+source_vintage,"datetime64[ms, UTC]",provenance_status,audit metadata; not an analogue outcome
+source_url_or_reference,str,provenance_status,audit metadata; not an analogue outcome
+retrieval_timestamp_utc,"datetime64[us, UTC]",provenance_status,audit metadata; not an analogue outcome
+source_date_availability_utc,"datetime64[us, UTC]",provenance_status,audit metadata; not an analogue outcome
+availability_refinement,str,provenance_status,audit metadata; not an analogue outcome
+transformation_rules,str,provenance_status,audit metadata; not an analogue outcome
+raw_source_value,float64,release_payload,available at official release T; POST_RELEASE_IMMEDIATE only
+raw_source_unit,str,release_payload,available at official release T; POST_RELEASE_IMMEDIATE only
+value_status,str,provenance_status,audit metadata; not an analogue outcome
+consensus_status,str,pre_release_context,must be strictly before T; unavailable in current audited source
+point_in_time_verified,bool,provenance_status,audit metadata; not an analogue outcome
+event_revision_raw,float64,release_payload,revision published at T; never overwrites prior value
+event_revision_abs,float64,release_payload,revision published at T; never overwrites prior value
+event_revision_direction,str,release_payload,revision published at T; never overwrites prior value
+economic_positive_direction,str,provenance_status,audit metadata; not an analogue outcome
+event_value_contract_version,str,provenance_status,audit metadata; not an analogue outcome
+source_v04b_contract_version,str,provenance_status,audit metadata; not an analogue outcome
+surprise_signed_raw,float64,release_payload,requires actual at T and prior consensus; causal history only
+surprise_abs_raw,float64,release_payload,requires actual at T and prior consensus; causal history only
+surprise_status,str,release_payload,requires actual at T and prior consensus; causal history only
+surprise_strength_direction,object,release_payload,requires actual at T and prior consensus; causal history only
+surprise_inflation_direction,object,release_payload,requires actual at T and prior consensus; causal history only
+surprise_z_robust,float64,release_payload,requires actual at T and prior consensus; causal history only
+normalization_history_count,int64,release_payload,requires actual at T and prior consensus; causal history only
+normalization_method,str,release_payload,requires actual at T and prior consensus; causal history only
+normalization_timestamp_cutoff,"datetime64[s, UTC]",release_payload,requires actual at T and prior consensus; causal history only
+surprise_bucket_causal,object,release_payload,requires actual at T and prior consensus; causal history only
+revision_component_count,int64,provenance_status,audit metadata; not an analogue outcome

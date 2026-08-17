@@ -1,0 +1,5 @@
+event_type,measure_id,rows,first_event_utc,last_event_utc,actual_count,previous_count,revision_count,prior_period_first_release_count,consensus_count,source,source_authority,point_in_time_verified_count
+us_cpi_release,core_cpi_yoy_sa,118,2015-03-24 12:30:00+00:00,2026-08-12 12:30:00+00:00,118,117,3,0,0,FRED/ALFRED point-in-time BLS series,U.S. Bureau of Labor Statistics,118
+us_cpi_release,headline_cpi_yoy_sa,118,2015-03-24 12:30:00+00:00,2026-08-12 12:30:00+00:00,118,117,3,0,0,FRED/ALFRED point-in-time BLS series,U.S. Bureau of Labor Statistics,118
+us_employment_situation,nonfarm_payroll_change,124,2015-01-09 13:30:00+00:00,2026-08-07 12:30:00+00:00,124,123,121,1,0,FRED/ALFRED point-in-time BLS series,U.S. Bureau of Labor Statistics,124
+us_employment_situation,unemployment_rate,124,2015-01-09 13:30:00+00:00,2026-08-07 12:30:00+00:00,124,123,2,0,0,FRED/ALFRED point-in-time BLS series,U.S. Bureau of Labor Statistics,124

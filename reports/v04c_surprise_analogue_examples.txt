@@ -1,0 +1,13 @@
+MARKETFUSION V0.4C SURPRISE ANALOGUE EXAMPLES
+eligible_surprise_queries: 0
+minimum_descriptive_sample: 20
+SURPRISE_ANALOGUE_STATUS: INSUFFICIENT_SAMPLE
+
+No analogue examples or directional statistics were generated because no audited
+historical consensus provider is present. Actual values were not substituted for
+consensus, market prices were not used to infer expectations, and future reactions
+were not used to construct surprise fields.
+
+The frozen V0.4B context-only audit remains the comparison baseline. A new surprise
+audit must be enabled only after sufficient strictly pre-release consensus coverage
+and an independently reviewed POST_RELEASE_IMMEDIATE retrieval policy exist.

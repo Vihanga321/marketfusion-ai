@@ -268,6 +268,38 @@ Canonical and readable outputs are:
 - `reports/v04b_analogue_examples.txt`
 - `reports/v04b_walk_forward_retrieval_audit.csv`
 
+## V0.4C Event Value and Surprise Intelligence
+
+V0.4C adds a normalized child table because one scheduled release contains multiple measures. CPI retains point-in-time headline and core year-over-year measures; the Employment Situation retains nonfarm payroll change and unemployment rate separately. Average hourly earnings is absent because it has not been audited in the local point-in-time source.
+
+```powershell
+.\scripts\run_v04c_event_value_pipeline.ps1
+```
+
+The builder hard-fails unless the V0.4B memory SHA-256, row/column count, event universe, timestamp range, and contract match the frozen V0.4C input contract. Actual and revision data come from official BLS series preserved through ALFRED real-time periods. ALFRED's date-only first vintage is refined to the already validated BLS 08:30 Eastern event timestamp; the original conservative macro availability timestamp is retained separately for audit. FRED documents that real-time periods represent when information was known and that `pc1` means percent change from year ago: https://fred.stlouisfed.org/docs/api/fred/realtime_period.html and https://fred.stlouisfed.org/docs/api/fred/series_observations.html.
+
+`actual_value` is the measure released at T. `previous_value_pre_release` is the last value genuinely available before T. `previous_value_revised_at_release` is a changed prior-period value published at T and never overwrites the pre-release value. A prior period first published at T, such as during a delayed multi-period release, has its own field and is not mislabeled as a revision.
+
+Every older transformed observation changed on the release vintage date is also preserved as a separate row in `v04c_event_value_revision_components.parquet`. This avoids silently summing benchmark or multi-month revisions. These are revisions of the audited transformed measures; raw payroll-level revision arithmetic would require an additional raw-level source.
+
+Consensus is a separate pre-release fact. The repository has no audited historical consensus provider, so `consensus_value`, raw surprise, normalized surprise, and surprise buckets remain null/unavailable. Actual minus consensus cannot exist before release because actual is not public until T. Actual is never substituted for consensus and market price never infers expectations.
+
+Decision modes are explicit:
+
+- `PRE_RELEASE` allows calendar, pre-event price, macro state, prior values, and a consensus only when its availability is strictly before T. It rejects actuals, release revisions, surprises, and market outcomes.
+- `POST_RELEASE_IMMEDIATE` additionally permits audited release payload available at T, but still rejects all future reaction outcomes.
+
+When consensus becomes available, robust surprise normalization uses only prior same-measure releases strictly before the query. Median/IQR normalization has a prior-only standard-deviation fallback and a ten-observation warm-up. The current surprise walk-forward report is `INSUFFICIENT_SAMPLE` rather than fabricated research.
+
+Generated Parquet datasets remain ignored by Git:
+
+- `data/processed/v04c_event_values.parquet`
+- `data/processed/v04c_event_value_revision_components.parquet`
+- `data/processed/v04c_event_value_features.parquet`
+- `data/processed/v04c_historical_event_memory.parquet`
+
+Readable V0.4C reports document the fingerprint, values, schema, source coverage, decision registries, enriched memory, surprise coverage, and insufficient-sample audit under `reports/`.
+
 ## Project preflight and CI
 
 A local preflight checks Python syntax, unit tests, repository secret hygiene, the read-only trading boundary, all PowerShell syntax, event-table validation when local data exist, Java 8 compilation, and synthetic tick-reconstruction tests:
