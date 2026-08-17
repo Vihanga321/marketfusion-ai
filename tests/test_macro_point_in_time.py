@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from build_features_mt5_macro import released_today_asof  # noqa: E402
+from macro.point_in_time import released_today_asof  # noqa: E402
 
 
 class MacroPointInTimeTests(unittest.TestCase):
