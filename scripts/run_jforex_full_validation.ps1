@@ -34,8 +34,6 @@ if (-not $env:DUKASCOPY_USER -or -not $env:DUKASCOPY_PASSWORD) {
     throw 'DUKASCOPY_USER and DUKASCOPY_PASSWORD must be loaded in this PowerShell process'
 }
 
-# Restore the known working local toolchain when a fresh VS Code terminal does
-# not inherit Maven/Java configuration.
 $OracleJava8 = 'C:\Program Files\Java\jdk1.8.0_501'
 if (Test-Path (Join-Path $OracleJava8 'bin\java.exe')) {
     $env:JAVA_HOME = $OracleJava8
@@ -74,7 +72,7 @@ function Test-BatchOutputs {
     $ExpectedRows = Get-TsvRows -Path $InputFile
     $SummaryRows = Get-TsvRows -Path $Summary
     if ($SummaryRows.Count -ne $ExpectedRows.Count) {
-        throw "Batch output row-count mismatch for $BatchName: expected $($ExpectedRows.Count), got $($SummaryRows.Count)"
+        throw "Batch output row-count mismatch for ${BatchName}: expected $($ExpectedRows.Count), got $($SummaryRows.Count)"
     }
 
     $ExpectedIds = @($ExpectedRows | ForEach-Object { $_.event_id } | Sort-Object)
@@ -111,10 +109,6 @@ function Invoke-JForexBatch {
         Write-Host ("--- {0} ({1}/{2}) attempt {3}/{4} ---" -f $Batch.Name, $Ordinal, $Total, $Attempt, $MaxAttempts)
         Push-Location $JForexRoot
         try {
-            # Use exec:exec, not exec:java. The exec goal launches a separate JVM,
-            # so JForex SDK background threads cannot keep Maven itself alive after
-            # the validator has finished. RobustV2 also calls System.exit at its
-            # standalone process boundary after disconnecting from Dukascopy.
             $ExecArgs = "-cp %classpath $ValidatorClass `"$InputFile`" `"$ResultDir`""
             mvn exec:exec `
                 '-Dexec.executable=java' `
@@ -142,9 +136,6 @@ function Invoke-JForexBatch {
         Write-Host ("{0}: PASS={1} INCOMPLETE={2} MISMATCH={3} ERROR={4}" -f $Batch.Name, $Pass, $Incomplete, $Mismatch, $Errors)
 
         if (($Mismatch -gt 0) -or ($Errors -gt 0)) {
-            # Preserve the batch result and continue. The final aggregator will
-            # report every hard failure across the complete event set instead of
-            # stopping at the first bad event.
             return
         }
 
