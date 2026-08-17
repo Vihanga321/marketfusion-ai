@@ -1,0 +1,77 @@
+MARKETFUSION V0.4B ANALOGUE EXAMPLES
+Method: same-event-type weighted Euclidean distance over the explicit retrieval registry.
+Normalization: candidate-history median/IQR only; standard deviation fallback; query excluded.
+Ranking explanations below use context dimensions only. Query outcomes are not used.
+Historical outcomes are attached only after each ranking is frozen.
+Analogue aggregates are empirical statistics, not trade probabilities.
+
+WALK-FORWARD DESCRIPTIVE COMPARISON
+queries: 222
+same_event_type_warmup: 10
+top_k: 5
+Interpretation: directional hit rates are descriptive research diagnostics, not evidence of edge.
+1m: analogue=0.545; same-type-unconditional=0.473; recent-5=0.518
+5m: analogue=0.559; same-type-unconditional=0.491; recent-5=0.554
+15m: analogue=0.536; same-type-unconditional=0.527; recent-5=0.532
+60m: analogue=0.509; same-type-unconditional=0.505; recent-5=0.518
+240m: analogue=0.527; same-type-unconditional=0.491; recent-5=0.509
+
+QUERY: bls:us_cpi_release:20180913T1230Z
+timestamp: 2018-09-13T12:30:00+00:00
+event_type: us_cpi_release
+candidate_count: 34
+  #1 bls:us_cpi_release:20171213T1330Z | 2017-12-13T13:30:00+00:00 | distance=0.6544 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000, context_return_5m_pips delta_z=-0.052
+     historical outcomes (post-ranking): 1m=19.30p, 5m=27.45p, 15m=26.85p, 60m=23.45p, 240m=28.55p
+  #2 bls:us_cpi_release:20180112T1330Z | 2018-01-12T13:30:00+00:00 | distance=0.6906 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=-17.55p, 5m=3.10p, 15m=-26.10p, 60m=3.80p, 240m=-13.10p
+  #3 bls:us_cpi_release:20170614T1230Z | 2017-06-14T12:30:00+00:00 | distance=0.7362 | closest context: context_macro_ecb_rate delta_z=0.000, context_pre_event_max_spread_10m_pips delta_z=0.000, context_release_local_hour delta_z=0.000, context_return_10m_pips delta_z=0.000, context_trend_10m_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=24.75p, 5m=45.65p, 15m=48.50p, 60m=66.60p, 240m=71.70p
+  #4 bls:us_cpi_release:20171115T1330Z | 2017-11-15T13:30:00+00:00 | distance=0.7435 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_month_sin delta_z=0.000, context_return_5m_pips delta_z=-0.069
+     historical outcomes (post-ranking): 1m=-7.25p, 5m=12.70p, 15m=20.70p, 60m=-21.45p, 240m=-46.00p
+  #5 bls:us_cpi_release:20180612T1230Z | 2018-06-12T12:30:00+00:00 | distance=0.7689 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_us_dst delta_z=0.000, context_volatility_regime_code delta_z=0.000, context_realized_vol_10m delta_z=-0.031
+     historical outcomes (post-ranking): 1m=9.50p, 5m=10.45p, 15m=14.00p, 60m=12.55p, 240m=-0.10p
+
+QUERY: bls:us_employment_situation:20200702T1230Z
+timestamp: 2020-07-02T12:30:00+00:00
+event_type: us_employment_situation
+candidate_count: 59
+  #1 bls:us_employment_situation:20150702T1230Z | 2015-07-02T12:30:00+00:00 | distance=3.6950 | closest context: context_days_since_previous_same_type delta_z=0.000, context_macro_fed_funds_rate delta_z=0.000, context_month_cos delta_z=0.000, context_month_sin delta_z=0.000, context_release_local_hour delta_z=0.000
+     historical outcomes (post-ranking): 1m=45.50p, 5m=64.45p, 15m=29.15p, 60m=33.95p, 240m=40.55p
+  #2 bls:us_employment_situation:20180406T1230Z | 2018-04-06T12:30:00+00:00 | distance=3.8322 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_us_dst delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=21.00p, 5m=24.60p, 15m=3.60p, 60m=43.75p, 240m=37.25p
+  #3 bls:us_employment_situation:20190308T1330Z | 2019-03-08T13:30:00+00:00 | distance=3.8510 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000, context_pre_event_max_spread_10m_pips delta_z=0.115
+     historical outcomes (post-ranking): 1m=18.85p, 5m=-4.95p, 15m=8.95p, 60m=6.55p, 240m=19.40p
+  #4 bls:us_employment_situation:20170804T1230Z | 2017-08-04T12:30:00+00:00 | distance=3.8732 | closest context: context_macro_ecb_rate delta_z=0.000, context_pre_event_spread_pips delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=-26.50p, 5m=-26.65p, 15m=-9.60p, 60m=-28.25p, 240m=-114.55p
+  #5 bls:us_employment_situation:20170602T1230Z | 2017-06-02T12:30:00+00:00 | distance=3.9025 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_us_dst delta_z=0.000, context_month_cos delta_z=-0.134
+     historical outcomes (post-ranking): 1m=25.05p, 5m=45.65p, 15m=59.95p, 60m=48.75p, 240m=51.75p
+
+QUERY: bls:us_cpi_release:20230613T1230Z
+timestamp: 2023-06-13T12:30:00+00:00
+event_type: us_cpi_release
+candidate_count: 86
+  #1 bls:us_cpi_release:20230510T1230Z | 2023-05-10T12:30:00+00:00 | distance=0.9136 | closest context: context_macro_ecb_rate delta_z=0.000, context_macro_fed_funds_rate delta_z=0.000, context_macro_rate_differential delta_z=0.000, context_release_local_hour delta_z=0.000, context_us_dst delta_z=0.000
+     historical outcomes (post-ranking): 1m=28.30p, 5m=30.70p, 15m=48.60p, 60m=38.25p, 240m=26.85p
+  #2 bls:us_cpi_release:20230214T1330Z | 2023-02-14T13:30:00+00:00 | distance=1.1068 | closest context: context_month_sin delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=-22.50p, 5m=30.50p, 15m=4.70p, 60m=-31.55p, 240m=-34.20p
+  #3 bls:us_cpi_release:20230314T1230Z | 2023-03-14T12:30:00+00:00 | distance=1.1688 | closest context: context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_us_dst delta_z=0.000, context_weekday_cos delta_z=0.000, context_weekday_sin delta_z=0.000
+     historical outcomes (post-ranking): 1m=14.25p, 5m=-12.95p, 15m=0.75p, 60m=2.05p, 240m=-10.05p
+  #4 bls:us_cpi_release:20220913T1230Z | 2022-09-13T12:30:00+00:00 | distance=1.2506 | closest context: context_days_since_previous_same_type delta_z=0.000, context_macro_us_unemployment delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_us_dst delta_z=0.000
+     historical outcomes (post-ranking): 1m=-69.75p, 5m=-87.65p, 15m=-117.45p, 60m=-146.05p, 240m=-173.15p
+  #5 bls:us_cpi_release:20221110T1330Z | 2022-11-10T13:30:00+00:00 | distance=1.3564 | closest context: context_macro_us_unemployment delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000, context_macro_us_2y_yield delta_z=-0.044
+     historical outcomes (post-ranking): 1m=102.95p, 5m=126.25p, 15m=161.10p, 60m=185.90p, 240m=199.90p
+
+QUERY: bls:us_employment_situation:20260605T1230Z
+timestamp: 2026-06-05T12:30:00+00:00
+event_type: us_employment_situation
+candidate_count: 121
+  #1 bls:us_employment_situation:20230505T1230Z | 2023-05-05T12:30:00+00:00 | distance=0.5667 | closest context: context_release_local_hour delta_z=0.000, context_return_10m_pips delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000, context_us_dst delta_z=0.000
+     historical outcomes (post-ranking): 1m=-30.35p, 5m=-21.95p, 15m=-39.85p, 60m=-26.70p, 240m=9.70p
+  #2 bls:us_employment_situation:20180309T1330Z | 2018-03-09T13:30:00+00:00 | distance=0.6035 | closest context: context_days_since_previous_same_type delta_z=0.000, context_pre_event_spread_pips delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=0.55p, 5m=16.80p, 15m=-8.95p, 60m=13.35p, 240m=36.75p
+  #3 bls:us_employment_situation:20260403T1230Z | 2026-04-03T12:30:00+00:00 | distance=0.6158 | closest context: context_macro_ecb_rate delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_us_dst delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=-12.00p, 5m=-15.15p, 15m=-11.70p, 60m=-12.40p, 240m=-23.35p
+  #4 bls:us_employment_situation:20250110T1330Z | 2025-01-10T13:30:00+00:00 | distance=0.7817 | closest context: context_pre_event_max_spread_10m_pips delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_10m_code delta_z=0.000, context_trend_5m_code delta_z=0.000, context_volatility_regime_code delta_z=0.000
+     historical outcomes (post-ranking): 1m=-58.80p, 5m=-81.90p, 15m=-55.60p, 60m=-45.25p, 240m=-66.85p
+  #5 bls:us_employment_situation:20240607T1230Z | 2024-06-07T12:30:00+00:00 | distance=0.8121 | closest context: context_month_cos delta_z=0.000, context_month_sin delta_z=0.000, context_release_local_hour delta_z=0.000, context_trend_5m_code delta_z=0.000, context_us_dst delta_z=0.000
+     historical outcomes (post-ranking): 1m=-47.45p, 5m=-56.55p, 15m=-64.60p, 60m=-66.65p, 240m=-86.35p

@@ -9,7 +9,8 @@ No result in this repository should be interpreted as a live-trading recommendat
 - **V0.1:** Yahoo Finance daily baseline. Preserved because validation exposed a candle-data artifact and a misleading high apparent accuracy.
 - **V0.2:** Clean MT5 historical H1/H4 price pipeline plus a read-only live EUR/USD tick collector. OANDA files are retained but are not the active data path.
 - **V0.3:** Point-in-time macroeconomic intelligence using official FRED/ALFRED and ECB data with explicit vintage/availability semantics. BLS values without historical release timestamps remain quarantined from the macro-level model.
-- **V0.4A (in progress):** economic-release timestamp/provenance validation plus read-only historical EUR/USD event-window coverage. BLS direct archived-calendar access is preferred; when it is unavailable, the current fallback is explicitly labeled reconstruction from ALFRED first-vintage timing plus the official BLS 08:30 Eastern release convention. Consensus forecasts are still excluded until a trustworthy historical provider is established.
+- **V0.4A:** frozen economic-release timestamp/provenance and EUR/USD reaction pipeline. Of 276 events, 242 strict PASS events are eligible and 34 provider-incomplete/mismatch events remain quarantined.
+- **V0.4B:** leakage-safe Historical Economic Event Memory and deterministic analogue-retrieval research. This is memory infrastructure, not a final forecast model or evidence of an edge.
 
 ## Read-only MetaTrader 5 tick layer
 
@@ -237,6 +238,35 @@ The canonical wide schema prefixes pre-release values with `context_` and every 
 - `reports/v04a_historical_event_memory_schema.csv`
 
 Only rows with `model_eligible_market_reaction=true` may enter a future event model. The aggregator sets that flag only for strict PASS results; INCOMPLETE, MISMATCH, and ERROR are rejected by the training gate.
+
+## V0.4B Historical Economic Event Memory
+
+Historical Event Memory stores two logically separate sides of each of the 242 strict V0.4A events. `context_*` fields are facts available no later than the event timestamp and are the only fields eligible for retrieval. `outcome_*` fields are validated post-release reactions and are attached only after analogue ranking is frozen. Outcomes may be inspected as history, but they cannot enter distances, query vectors, normalization, regimes, clustering, or feature matrices.
+
+The builder first verifies the frozen V0.4A Parquet SHA-256, shape, contract, timestamp range, and event-type counts. It also re-verifies each cached reaction window and all frozen adjudication evidence. A changed source fails hard instead of silently rebuilding memory.
+
+```powershell
+.\scripts\run_v04b_historical_event_memory.ps1
+```
+
+The pre-event price context is sourced only from exact Dukascopy ticks in `[T-10m,T)`. It provides 5-minute and 10-minute returns plus 10-minute volatility, range, and spread context. Longer price lookbacks are deliberately absent because the frozen cache does not cover them and V0.4B does not interpolate, forward-fill, or splice a different broker. Volatility regimes use expanding same-event-type history strictly before each event.
+
+Point-in-time macro values come only from the audited `macro_safe.parquet`. Every selected release/vintage has `available_from_utc <= event_timestamp_utc`; later revisions are unavailable to the historical query. Event values such as actual, prior, consensus, forecast, and surprise remain absent until a separately audited source exists.
+
+The retrieval registry in `src/memory/retrieval_feature_registry.py` is an explicit allowlist. The baseline uses same-event-type candidates with timestamps strictly earlier than the query, candidate-history median/IQR normalization (standard-deviation fallback), and weighted Euclidean distance. Missing optional context is handled by pairwise weight renormalization; missing required context fails. Ties are ordered deterministically by timestamp and event ID.
+
+The default walk-forward audit uses a ten-event warm-up per event type and five analogues. It compares the analogue median descriptively with the expanding same-type unconditional median/directional frequency and the five most recent same-type events. Historical analogue frequencies are empirical summaries, not calibrated probabilities, forecasts, trade signals, or evidence of profitability.
+
+Canonical and readable outputs are:
+
+- `data/processed/v04b_historical_event_memory.parquet` (generated locally and ignored by Git)
+- `reports/v04a_event_reaction_fingerprint.txt`
+- `reports/v04b_historical_event_memory_sample.csv`
+- `reports/v04b_historical_event_memory_quality.txt`
+- `reports/v04b_historical_event_memory_schema.csv`
+- `reports/v04b_retrieval_feature_registry.csv`
+- `reports/v04b_analogue_examples.txt`
+- `reports/v04b_walk_forward_retrieval_audit.csv`
 
 ## Project preflight and CI
 

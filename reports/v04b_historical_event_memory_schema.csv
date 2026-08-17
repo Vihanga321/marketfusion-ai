@@ -1,0 +1,227 @@
+column,dtype,logical_side,retrieval_approved,availability_semantics,source,required
+event_id,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+event_type,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+event_timestamp_utc,"datetime64[us, UTC]",identity_provenance,False,known at or before event T,see column family/provenance fields,True
+reference_period,"datetime64[us, UTC]",identity_provenance,False,known at or before event T,see column family/provenance fields,True
+timestamp_precision,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+timestamp_provenance,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+market_data_source,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+production_status,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+adjudication_class,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+model_eligible_market_reaction,bool,provenance,False,metadata only,see column family/provenance fields,True
+reaction_contract_version,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+reaction_extraction_status,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+context_pre_bar_timestamp_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_pre_mid_close,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_pre_event_spread_pips,float64,retrieval_context,True,closing tick of T-1m < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+outcome_bar_timestamp_1m_utc,"datetime64[us, UTC]",historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_mid_close_1m,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reaction_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_abs_reaction_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_direction_1m,str,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_spread_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_up_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_down_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_range_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_expansion_1m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_bar_timestamp_5m_utc,"datetime64[us, UTC]",historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_mid_close_5m,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reaction_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_abs_reaction_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_direction_5m,str,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_spread_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_up_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_down_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_range_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_expansion_5m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_bar_timestamp_15m_utc,"datetime64[us, UTC]",historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_mid_close_15m,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reaction_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_abs_reaction_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_direction_15m,str,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_spread_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_up_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_down_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_range_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_expansion_15m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_bar_timestamp_60m_utc,"datetime64[us, UTC]",historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_mid_close_60m,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reaction_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_abs_reaction_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_direction_60m,str,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_spread_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_up_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_down_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_range_60m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_bar_timestamp_240m_utc,"datetime64[us, UTC]",historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_mid_close_240m,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reaction_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_abs_reaction_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_direction_240m,str,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_spread_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_spread_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_up_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_max_down_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_range_240m_pips,float64,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_continued_1m_to_5m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reversed_1m_to_5m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_continued_5m_to_15m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reversed_5m_to_15m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_continued_15m_to_60m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+outcome_reversed_15m_to_60m,bool,historical_outcomes,False,available only after event T; prohibited from retrieval,see column family/provenance fields,True
+context_price_window_start_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_price_available_through_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_return_5m_pips,float64,retrieval_context,True,source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_return_10m_pips,float64,retrieval_context,True,source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_realized_vol_10m,float64,retrieval_context,True,source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_range_10m_pips,float64,retrieval_context,True,source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_pre_event_max_spread_10m_pips,float64,retrieval_context,True,source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_trend_5m,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_trend_10m,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_trend_5m_code,float64,retrieval_context,True,derived only from source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_trend_10m_code,float64,retrieval_context,True,derived only from source ticks < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",True
+context_price_source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_price_window_sha256,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_month,int8,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_month_sin,float64,retrieval_context,True,deterministic at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_month_cos,float64,retrieval_context,True,deterministic at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_weekday,int8,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_weekday_sin,float64,retrieval_context,True,deterministic at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_weekday_cos,float64,retrieval_context,True,deterministic at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_release_local_hour,float64,retrieval_context,True,America/New_York conversion at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_us_dst,float64,retrieval_context,True,America/New_York DST state at event_timestamp_utc,Deterministic event timestamp/calendar transformation,True
+context_days_since_previous_same_type,float64,retrieval_context,True,previous same-type event_timestamp_utc < event_timestamp_utc,Deterministic event timestamp/calendar transformation,False
+context_calendar_source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_volatility_regime,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_volatility_regime_code,float64,retrieval_context,True,thresholds fitted only on events < event_timestamp_utc,"Dukascopy JForex ticks; exact window [T-10m,T); no post-T ticks",False
+context_volatility_regime_lower,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_volatility_regime_upper,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_volatility_regime_rule,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_fed_funds_rate,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_fed_funds_rate__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_fed_funds_rate__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_fed_funds_rate__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_fed_funds_rate__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_fed_funds_rate__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_2y_yield,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_2y_yield__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_2y_yield__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_2y_yield__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_2y_yield__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_2y_yield__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_10y_yield,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_10y_yield__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_10y_yield__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_10y_yield__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_10y_yield__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_10y_yield__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_cpi_yoy,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_cpi_yoy__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_cpi_yoy__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_cpi_yoy__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_cpi_yoy__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_cpi_yoy__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_cpi_yoy,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_core_cpi_yoy__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_cpi_yoy__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_cpi_yoy__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_cpi_yoy__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_cpi_yoy__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_unemployment,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_unemployment__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_unemployment__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_unemployment__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_unemployment__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_unemployment__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_payroll_growth,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_payroll_growth__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_payroll_growth__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_payroll_growth__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_payroll_growth__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_payroll_growth__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_gdp_growth,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_gdp_growth__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_gdp_growth__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_gdp_growth__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_gdp_growth__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_gdp_growth__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_pce,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_pce__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_pce__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_pce__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_pce__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_pce__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_pce,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_core_pce__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_pce__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_pce__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_pce__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_core_pce__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_retail_sales_yoy,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_us_retail_sales_yoy__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_retail_sales_yoy__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_retail_sales_yoy__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_retail_sales_yoy__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_us_retail_sales_yoy__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_ecb_rate,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_ecb_rate__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_ecb_rate__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_ecb_rate__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_ecb_rate__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_ecb_rate__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_hicp__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_core_hicp__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_unemployment__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_gdp_growth__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_2y_yield__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield,float64,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield__observation_period,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield__vintage_date,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_euro_10y_yield__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_yield_curve_10y_2y,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_yield_curve_10y_2y__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_yield_curve_10y_2y__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_yield_curve_10y_2y__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_rate_differential,float64,retrieval_context,True,macro available_from_utc <= event_timestamp_utc; latest known observation/vintage,Audited data/macro/macro_safe.parquet point-in-time as-of join,False
+context_macro_rate_differential__available_from_utc,"datetime64[us, UTC]",context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_rate_differential__source,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_rate_differential__availability_method,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+context_macro_source_file_sha256,str,context_audit_or_descriptor,False,documented pre-T context/audit metadata,see column family/provenance fields,False
+memory_contract_version,str,identity_provenance,False,known at or before event T,see column family/provenance fields,True
+source_reaction_dataset_sha256,str,provenance,False,metadata only,see column family/provenance fields,True
+actual,not_populated,future_event_values,False,absent until separately audited,none,False
+previous,not_populated,future_event_values,False,absent until separately audited,none,False
+consensus,not_populated,future_event_values,False,absent until separately audited,none,False
+forecast,not_populated,future_event_values,False,absent until separately audited,none,False
+surprise,not_populated,future_event_values,False,absent until separately audited,none,False

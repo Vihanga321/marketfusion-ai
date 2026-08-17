@@ -1,0 +1,11 @@
+MARKETFUSION V0.4A REACTION DATASET FINGERPRINT
+file: data/processed/v04a_event_reactions.parquet
+sha256: 5914E7DA16680CA0F5CF6ADC49892A50F141118EF9FB167571B46F6DB9EAFD12
+row_count: 242
+column_count: 74
+contract_version: v0.4a-event-reaction-v1
+min_timestamp_utc: 2015-01-09 13:30:00+00:00
+max_timestamp_utc: 2026-08-12 12:30:00+00:00
+us_cpi_release: 118
+us_employment_situation: 124
+FINGERPRINT_STATUS: PASS
