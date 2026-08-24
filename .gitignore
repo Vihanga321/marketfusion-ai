@@ -15,6 +15,9 @@ data/mt5/calendar/
 data/mt5/continuous/
 data/intelligence/
 data/inference/
+data/runtime/
+*.pid
+*.lock
 data/processed/*.parquet
 data/dukascopy/
 data/provider_audit/

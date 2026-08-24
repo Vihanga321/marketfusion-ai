@@ -1,0 +1,41 @@
+MARKETFUSION V0.6B RISK FUSION + ADVISORY CONTRACT
+contract_version: v0.6b-risk-fusion-advisory-v1
+symbol: EURUSD
+mode: SHADOW_ADVISORY_ONLY
+trading_enabled: false
+manual_confirmation_required: true
+
+CANONICAL INPUTS
+market: latest completed causal V0.5A decision row plus strictly-prior V0.5A history
+model: V0.6A output from registry-approved V0.5C CHAMPION artifacts only
+event: exact audited V0.4D target event IDs/codes only
+intelligence: latest causal V0.5B context at or before the market decision
+memory: frozen V0.4B Historical Event Memory availability/diagnostic context only
+
+CANONICAL OUTPUT
+action: WAIT | BUY_BIAS | SELL_BIAS
+action_meaning: explicit human-readable research-only meaning
+confidence: VERY_LOW | LOW | MEDIUM | HIGH
+confidence_meaning: explicit interpretation without profitability or edge claims
+decision_gate: deterministic gate code
+trade_window: nullable advisory observation window; never an order instruction
+next_reassessment_utc: always present
+reasons: ordered structured records with code, priority, blocking, source, message, evidence
+
+FUSION POLICY
+horizon_weights: 15m=0.40, 60m=0.40, 240m=0.20
+weights_are_normalized_over_valid_approved_horizons: true
+minimum_direction_probability: 0.55
+minimum_probability_margin: 0.08
+minimum_approved_horizons: 2
+mixed_directional_horizons: WAIT
+missing_or_malformed_probability_fallback: NONE
+v05b_directional_override: false
+historical_memory_directional_override: false
+
+CURRENT EXPECTED STATE
+no_approved_champion: true
+action: WAIT
+confidence: VERY_LOW
+decision_gate: WAIT_NO_MODEL
+overall_status: PASS_FAIL_CLOSED_NO_CHAMPION

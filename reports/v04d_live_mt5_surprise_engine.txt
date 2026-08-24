@@ -1,5 +1,5 @@
 MARKETFUSION V0.4D LIVE MT5 SURPRISE ENGINE
-snapshot_rows: 60
+snapshot_rows: 78
 verified_post_release_actual_rows: 0
 verified_live_surprise_rows: 0
 consensus_rule: latest causally verified pre-release forecast from canonical consensus gate

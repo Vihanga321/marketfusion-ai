@@ -40,6 +40,8 @@ try {
     $V05BTests = Invoke-MarketFusionStage '3. V0.5B deterministic tests' { & (Join-Path $PSScriptRoot 'run_v05b_tests.ps1') }
     $V05CTests = Invoke-MarketFusionStage '3c. V0.5C lightweight deterministic validation' { & (Join-Path $PSScriptRoot 'run_v05c_tests.ps1') }
     $null = Invoke-MarketFusionStage '3d. V0.5C status (no training)' { & (Join-Path $PSScriptRoot 'show_v05c_status.ps1') }
+    $V06ATests = Invoke-MarketFusionStage '3e. V0.6A shadow-inference validation' { & (Join-Path $PSScriptRoot 'run_v06a_tests.ps1') }
+    $V06BTests = Invoke-MarketFusionStage '3f. V0.6B/V0.6C fusion-runtime validation' { & (Join-Path $PSScriptRoot 'run_v06b_tests.ps1') }
     $Mt5 = Invoke-MarketFusionStage '4. Read-only MT5 connectivity' { & $Python scripts\local_runtime_validation.py mt5 }
     $V05ACycle = Invoke-MarketFusionStage '5. V0.5A one-cycle validation' { & (Join-Path $PSScriptRoot 'run_v05a_once.ps1') }
 
@@ -64,6 +66,9 @@ try {
         Write-Host "`n=== 7a. V0.5B independent free-source diagnostics: SKIPPED BY REQUEST ==="
     }
     $V05BCycle = Invoke-MarketFusionStage '7b. V0.5B one-cycle validation' { & (Join-Path $PSScriptRoot 'run_v05b_once.ps1') }
+    $V06ACycle = Invoke-MarketFusionStage '7c. V0.6A one shadow cycle' { & (Join-Path $PSScriptRoot 'run_v06a_once.ps1') }
+    $V06BCycle = Invoke-MarketFusionStage '7d. V0.6B one advisory cycle' { & (Join-Path $PSScriptRoot 'run_v06b_once.ps1') }
+    $V06CCycle = Invoke-MarketFusionStage '7e. V0.6C one unified cycle' { & (Join-Path $PSScriptRoot 'run_v06c_once.ps1') }
 
     Write-Host "`n=== 8. V0.5A + V0.5B integration and final audit ==="
     & $Python scripts\local_runtime_validation.py audit `
@@ -71,10 +76,15 @@ try {
         --v05a-tests $V05ATests `
         --v05b-tests $V05BTests `
         --v05c-tests $V05CTests `
+        --v06a-tests $V06ATests `
+        --v06b-tests $V06BTests `
         --mt5 $Mt5 `
         --v05a-cycle $V05ACycle `
         --v04d $V04D `
-        --v05b-cycle $V05BCycle
+        --v05b-cycle $V05BCycle `
+        --v06a-cycle $V06ACycle `
+        --v06b-cycle $V06BCycle `
+        --v06c-cycle $V06CCycle
     $AuditExit = $LASTEXITCODE
 
     Write-Host "`n=== 9. Final summary ==="

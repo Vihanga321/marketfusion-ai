@@ -1,0 +1,11 @@
+field_group,canonical_source,causal_rule,directional_role,unavailable_behavior
+market_snapshot,V0.5A latest completed M5 decision,row timestamp must be <= now,primary model/risk input,WAIT
+market_regime,V0.5A prior decision history,threshold rows strictly precede current decision,risk gate,WAIT
+session,V0.5A session flags,current completed decision only,context/risk,OFF if flags absent
+spread,V0.5A current and recent-median fields,current completed decision only,risk gate,WAIT
+model_probabilities,V0.6A verified V0.5C CHAMPION output,current cycle and valid probability simplex,primary fusion input,WAIT_NO_MODEL
+event_risk,V0.4D verified consensus,exact audited target identity only,risk gate,blocking caution
+intelligence,V0.5B causal context,latest context timestamp <= market decision,context only no override,blocking if stale
+historical_memory,V0.4B frozen memory,availability diagnostic only,context only no override,degraded nonblocking
+trade_window,V0.6B derived policy,next M5 boundary and future event policy,advisory only,no window
+reassessment,V0.6B derived policy,next M5 or next event transition,advisory only,next M5

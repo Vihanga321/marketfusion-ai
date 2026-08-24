@@ -1,0 +1,36 @@
+MARKETFUSION V0.6C DASHBOARD STATE CONTRACT
+contract_version: v0.6c-unified-runtime-v1
+latest_state: data/runtime/v06/latest_marketfusion_state.json
+history: data/runtime/v06/state_history.parquet
+history_policy: one immutable first state per unique market decision timestamp; no outcome columns
+poll_interval_seconds: 15
+registry_reload: every decision cycle through V0.6A; registry remains source of truth
+
+TOP-LEVEL SECTIONS
+system: overall status, UTC/local generation time, mode, symbol, registry identity
+market: freshness, session, regime, spread, latest completed close
+predictions: V0.6A horizon outputs and normalized V0.6B fusion
+decision: action, direction, confidence, gate, manual/trading flags, UTC/local decision and reassessment times
+trade_window: nullable advisory-only window
+event: exact-target risk state, source coverage, nearest event, freshness
+intelligence: V0.5B freshness/counts/provider degradation; no directional override
+health: per-source states plus failed/degraded lists
+reasons: deterministic ordered structured reason records
+
+TIME POLICY
+canonical_storage_and_comparison: UTC
+human_display_timezone: Asia/Colombo via Python zoneinfo
+fixed_offset_arithmetic: forbidden
+
+ALLOWED OVERALL STATUSES
+PASS
+PASS_DEGRADED
+PASS_FAIL_CLOSED_NO_CHAMPION
+PASS_WITH_LIMITED_COVERAGE
+FAIL_CLOSED
+FAIL
+
+SAFETY
+trading_enabled: false
+manual_confirmation_required: true
+account_or_order_api_calls: none

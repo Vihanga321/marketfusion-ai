@@ -296,7 +296,12 @@ def run_shadow_cycle(now_utc: object | None = None, persist: bool = True) -> dic
             }
             continue
         champion_count += 1
-        result: dict[str, object] = {"model_id": str(record["model_id"]), "model_status": "APPROVED_CHAMPION"}
+        result: dict[str, object] = {
+            "model_id": str(record["model_id"]), "model_status": "APPROVED_CHAMPION",
+            "model_created_at_utc": str(record["created_at_utc"]),
+            "artifact_sha256": str(record["artifact_sha256"]),
+            "feature_contract_hash": str(record["feature_contract_hash"]),
+        }
         try:
             model = load_verified_champion(record, horizon)
             result.update(infer_horizon(model, feature_row))

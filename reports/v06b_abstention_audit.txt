@@ -1,0 +1,24 @@
+MARKETFUSION V0.6B ABSTENTION AUDIT
+scope: current V0.5C registry and V0.6A/V0.6B live behavior
+label: RESEARCH / SHADOW DIAGNOSTIC ONLY
+
+current_approved_champions_15m: 0
+current_approved_champions_60m: 0
+current_approved_champions_240m: 0
+current_live_directional_coverage: 0 percent
+current_live_abstention: 100 percent
+
+ROOT CAUSE
+The 100 percent live abstention is caused by the absence of any registry-approved CHAMPION. V0.6A correctly refuses to load CHALLENGER or REJECTED candidates and V0.6B does not invent fallback probabilities. This is intended fail-closed behavior.
+
+PER-HORIZON V0.5C EVIDENCE
+15m best: XGBOOST; balanced_accuracy=0.3398433206784944; promotion=NO_PROMOTION; failed history, balanced-accuracy, macro-F1, and log-loss gates.
+60m best: XGBOOST; balanced_accuracy=0.34904830286598093; promotion=NO_PROMOTION; failed history, balanced-accuracy, and log-loss gates.
+240m best: HIST_GRADIENT_BOOSTING; balanced_accuracy=0.3296062911447527; promotion=NO_PROMOTION; failed history, balanced-accuracy, macro-F1, and log-loss gates.
+
+THRESHOLD AUDIT
+V0.6B research thresholds are probability>=0.55 and top-two margin>=0.08 with at least two approved horizons. They cannot be evaluated for operational directional coverage until an approved champion exists. Thresholds must not be weakened to bypass V0.5C promotion gates. After a legitimate champion exists, audit coverage, calibration, error by horizon/regime/session/event state, and WAIT reasons on shadow outcomes before changing thresholds.
+
+profitability_claim: NONE
+edge_claim: NONE
+live_performance_claim: NONE

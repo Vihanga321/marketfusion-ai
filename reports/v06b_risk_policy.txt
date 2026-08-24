@@ -1,0 +1,50 @@
+MARKETFUSION V0.6B REVIEWABLE RISK POLICY
+
+MARKET REGIME
+source: V0.5A only
+volatility_field: m5_volatility_60m
+threshold_method: expanding quantiles from rows strictly before the current decision
+minimum_prior_rows: 20
+QUIET: current <= prior q25
+NORMAL: prior q25 < current <= prior q75
+HIGH: prior q75 < current <= prior q95
+EXTREME: current > prior q95; blocks direction
+trend_score: (0.50*return_15m + 0.30*return_60m + 0.20*return_240m) / max(current_volatility, prior_median, 1e-9)
+trend_bands: STRONG_DOWN<=-1.0; DOWN<=-0.25; RANGE=(-0.25,0.25); UP>=0.25; STRONG_UP>=1.0
+
+SESSION
+priority: OVERLAP, ASIA, LONDON, NEW_YORK, OFF
+source: V0.5A session flags only
+
+EVENT RISK
+identity_policy: exact audited V0.4D target event code/name only; no semantic guesses
+more_than_240_minutes_before: NONE
+240_to_60_minutes_before: WATCH
+60_to_15_minutes_before: ELEVATED
+15_minutes_before_through_15_minutes_after: BLOCK
+15_to_60_minutes_after: POST_RELEASE_VOLATILITY
+unavailable_incomplete_or_stale_event_data: blocking caution
+
+SPREAD
+ratio: current_m5_spread_points / m5_spread_median_60m
+NORMAL: ratio <= 1.5
+WIDE: 1.5 < ratio <= 2.5; blocks direction
+EXTREME: ratio > 2.5; blocks direction
+zero_over_zero: ratio 1.0
+negative_nonfinite_or_positive_over_zero_median: unavailable/extreme; blocks direction
+
+FRESHNESS
+market_max_age_minutes: 15
+inference_max_age_minutes: 5
+approved_model_artifact_max_age_days: 45
+intelligence_max_age_minutes: 30
+event_capture_max_age_hours: 24
+states: FRESH | STALE | UNAVAILABLE | DEGRADED
+
+TRADE WINDOW
+created_only_for_directional_advisory: true
+start: next M5 boundary
+end: shortest valid contributing horizon, truncated at event block start
+minimum_duration_minutes: 10
+too_short_or_WAIT: no advisory window
+orders_or_account_access: forbidden

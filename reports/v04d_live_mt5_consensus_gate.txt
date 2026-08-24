@@ -1,11 +1,11 @@
 MARKETFUSION V0.4D LIVE MT5 CONSENSUS GATE
-snapshot_rows: 60
-server_offset_verified_rows: 60
+snapshot_rows: 78
+server_offset_verified_rows: 78
 verified_server_offsets_hours: [3.0]
-exact_target_identity_rows: 60
-target_forecast_present_rows: 60
-strict_pre_release_target_rows: 60
-model_eligible_consensus_snapshot_rows: 60
+exact_target_identity_rows: 78
+target_forecast_present_rows: 78
+strict_pre_release_target_rows: 78
+model_eligible_consensus_snapshot_rows: 78
 canonical_verified_consensus_rows: 2
 eligibility_rule: exact audited MT5 identity + verified server/GMT offset + capture strictly before release + forecast present
 historical_policy: historical MT5 forecasts remain non-model-eligible

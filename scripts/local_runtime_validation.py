@@ -43,6 +43,9 @@ from src.learning.v05c_contract import (
     WALK_FORWARD_REPORT as V05C_WALK_REPORT,
 )
 from src.learning.v05c_registry import load_registry as load_v05c_registry, validate_registry as validate_v05c_registry
+from src.inference.v06a_contract import LATEST_STATUS_FILE as V06A_STATUS_FILE, REQUIRED_FEATURES as V06A_REQUIRED_FEATURES
+from src.fusion.v06b_contract import LATEST_ADVISORY_FILE as V06B_STATUS_FILE
+from src.runtime.v06c_contract import LATEST_STATE_FILE as V06C_STATE_FILE
 from src.marketdata.v05a_contract import (
     CONFLICT_DIR,
     FEATURE_COLUMNS,
@@ -61,6 +64,7 @@ MT5_REPORT = REPORTS / "marketfusion_mt5_connectivity.txt"
 PROVIDER_REPORT = REPORTS / "v05b_free_source_network_diagnostics.txt"
 INTEGRATION_REPORT = REPORTS / "v05ab_local_integration_audit.txt"
 FULL_REPORT = REPORTS / "marketfusion_full_local_runtime_validation.txt"
+V06_FULL_REPORT = REPORTS / "v06_full_validation.txt"
 CALENDAR_DIR = ROOT / "data" / "mt5" / "calendar"
 
 
@@ -476,24 +480,82 @@ def _v05c_audit() -> tuple[dict[str, object], list[str]]:
     }, failures
 
 
+def _v06_audit() -> tuple[dict[str, object], list[str]]:
+    failures: list[str] = []
+    payload: dict[str, object] = {
+        "v06a_status": "NOT_RUN", "v06b_status": "NOT_RUN", "v06c_status": "NOT_RUN",
+        "feature_count": len(V06A_REQUIRED_FEATURES), "registry_status": "UNKNOWN",
+        "champion_count": 0, "model_ids": [], "source_freshness": {},
+        "session": "UNKNOWN", "market_regime": "UNKNOWN", "spread_regime": "UNKNOWN",
+        "event_risk": "UNKNOWN", "intelligence_status": "UNKNOWN",
+        "action": "WAIT", "confidence": "VERY_LOW", "decision_gate": "WAIT_NOT_RUN",
+        "trade_window": "NOT_APPLICABLE_WAIT", "next_reassessment": "UNKNOWN",
+        "utc_time": "UNKNOWN", "asia_colombo_time": "UNKNOWN", "reason_codes": [],
+    }
+    try:
+        shadow = json.loads(V06A_STATUS_FILE.read_text(encoding="utf-8"))
+        advisory = json.loads(V06B_STATUS_FILE.read_text(encoding="utf-8"))
+        state = json.loads(V06C_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return payload, [f"V0.6 runtime output unavailable or invalid: {type(exc).__name__}: {exc}"]
+    registry = (state.get("system") or {}).get("registry") or {}
+    market = advisory.get("market") or {}
+    regime = market.get("regime") or {}
+    event = advisory.get("event") or {}
+    decision = state.get("decision") or {}
+    generated = (state.get("system") or {}).get("generated_time") or {}
+    horizons = shadow.get("horizons") or {}
+    model_ids = [item.get("model_id") for item in horizons.values() if item.get("model_id")]
+    payload.update({
+        "v06a_status": shadow.get("status"), "v06b_status": advisory.get("status"),
+        "v06c_status": (state.get("system") or {}).get("status"), "registry_status": registry.get("status"),
+        "champion_count": registry.get("champion_count", 0), "model_ids": model_ids,
+        "source_freshness": {
+            "market": (market.get("freshness") or {}).get("status"),
+            "model": ((advisory.get("model") or {}).get("freshness") or {}).get("status"),
+            "event": (event.get("freshness") or {}).get("status"),
+            "intelligence": (advisory.get("intelligence") or {}).get("status"),
+        },
+        "session": market.get("session"), "market_regime": regime.get("volatility_regime"),
+        "spread_regime": (market.get("spread") or {}).get("status"), "event_risk": event.get("status"),
+        "intelligence_status": (advisory.get("intelligence") or {}).get("status"),
+        "action": decision.get("action"), "confidence": decision.get("confidence"), "decision_gate": decision.get("gate"),
+        "trade_window": (state.get("trade_window") or {}).get("status"),
+        "next_reassessment": (decision.get("next_reassessment") or {}).get("utc"),
+        "utc_time": generated.get("utc"), "asia_colombo_time": generated.get("asia_colombo"),
+        "reason_codes": [item.get("code") for item in (state.get("reasons") or [])],
+    })
+    expected_no_champion = int(payload["champion_count"]) == 0
+    if expected_no_champion and (payload["action"], payload["confidence"], payload["decision_gate"]) != ("WAIT", "VERY_LOW", "WAIT_NO_MODEL"):
+        failures.append("V0.6 no-champion state did not fail closed as WAIT/VERY_LOW/WAIT_NO_MODEL")
+    if bool(decision.get("trading_enabled")) or not bool(decision.get("manual_confirmation_required")):
+        failures.append("V0.6 advisory safety flags are invalid")
+    if payload["v06c_status"] not in {"PASS", "PASS_DEGRADED", "PASS_FAIL_CLOSED_NO_CHAMPION", "PASS_WITH_LIMITED_COVERAGE", "FAIL_CLOSED"}:
+        failures.append("V0.6 overall status is outside its contract")
+    return payload, failures
+
+
 def full_audit(args: argparse.Namespace) -> int:
     v05a, failures_a = _v05a_audit()
     v04d, failures_d = _v04d_audit(args.v04d)
     v05b, failures_b = _v05b_audit()
     integration, failures_i = _integration_audit()
     v05c, failures_c = _v05c_audit()
+    v06, failures_6 = _v06_audit()
     mt5 = _mt5_report_values()
-    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "mt5", "v05a_cycle", "v05b_cycle") if getattr(args, name) != "PASS"]
+    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle") if getattr(args, name) != "PASS"]
     if args.v04d == "FAIL":
         stage_failures.append("v04d")
-    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c
+    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c + failures_6
     degraded = v05b["status"] == "PASS_DEGRADED"
-    final = "FAIL" if blockers else ("PASS_DEGRADED_EXTERNAL_PROVIDERS" if degraded else "PASS")
+    final = "FAIL" if blockers else ("PASS_FAIL_CLOSED_NO_CHAMPION" if int(v06["champion_count"]) == 0 else "PASS_DEGRADED" if degraded else "PASS")
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     tested_at = pd.Timestamp.now(tz="UTC").isoformat()
     next_step = (
-        "Keep the read-only MT5 collectors running; rerun this command after FRED/GDELT recover and after the upcoming target release to capture the first verified actual."
-        if degraded else "Keep the read-only collectors running and rerun this command after the upcoming target release."
+        "Build the V0.7 read-only dashboard over the stable V0.6C state contract; keep execution and account access disabled."
+        if int(v06["champion_count"]) == 0 else
+        "Keep the read-only collectors running and rerun validation after degraded providers recover."
+        if degraded else "Keep the read-only collectors running and continue shadow evaluation."
     )
     lines = [
         "MARKETFUSION FULL LOCAL RUNTIME VALIDATION", "", f"repository_commit: {commit}", f"tested_at_utc: {tested_at}", "",
@@ -513,11 +575,23 @@ def full_audit(args: argparse.Namespace) -> int:
         f"walk_forward_engine: {v05c['walk_forward_engine']}", f"model_registry_integrity: {v05c['registry_integrity']}",
         f"champion_15m: {v05c['champions'][15]}", f"champion_60m: {v05c['champions'][60]}",
         f"champion_240m: {v05c['champions'][240]}", f"training_status: {v05c['training_status']}", "",
+        "V0.6A:", f"status: {v06['v06a_status']}", f"feature_count: {v06['feature_count']}",
+        f"registry_status: {v06['registry_status']}", f"champion_count: {v06['champion_count']}",
+        f"model_ids: {', '.join(v06['model_ids']) or 'NONE'}", "",
+        "V0.6B:", f"status: {v06['v06b_status']}", f"source_freshness: {v06['source_freshness']}",
+        f"session: {v06['session']}", f"market_regime: {v06['market_regime']}", f"spread_regime: {v06['spread_regime']}",
+        f"event_risk: {v06['event_risk']}", f"intelligence_status: {v06['intelligence_status']}",
+        f"reason_codes: {', '.join(v06['reason_codes']) or 'NONE'}", "",
+        "V0.6C:", f"status: {v06['v06c_status']}", f"action: {v06['action']}", f"confidence: {v06['confidence']}",
+        f"decision_gate: {v06['decision_gate']}", f"trade_window: {v06['trade_window']}",
+        f"next_reassessment_utc: {v06['next_reassessment']}", f"generated_at_utc: {v06['utc_time']}",
+        f"generated_at_asia_colombo: {v06['asia_colombo_time']}", "trading_enabled: false", "manual_confirmation_required: true", "",
         "INTEGRATION:", f"market_plus_intelligence_join: {integration['status']}",
         f"future_information_violations: {integration['future']}", f"outcome_feature_leaks: {integration['leaks']}", "",
         "FINAL_STATUS:", final, "", "BLOCKERS:", *(blockers or ["NONE"]), "", "NEXT_SAFE_STEP:", next_step,
     ]
     _write(FULL_REPORT, lines)
+    _write(V06_FULL_REPORT, lines)
     print("V05A_LOCAL_STATUS")
     for label, count in v05a["rows"].items():
         print(f"{label} rows: {count}")
@@ -555,7 +629,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("mt5")
     sub.add_parser("providers")
     audit = sub.add_parser("audit")
-    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "mt5", "v05a_cycle", "v05b_cycle"):
+    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle"):
         audit.add_argument(f"--{name.replace('_', '-')}", choices=("PASS", "FAIL"), required=True)
     audit.add_argument("--v04d", choices=("PASS", "FAIL", "SKIPPED"), required=True)
     return result

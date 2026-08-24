@@ -1,0 +1,20 @@
+code,priority,blocking,source,meaning
+RUNTIME_ERROR,100,true,V0.6B,Unhandled runtime or input contract failure
+NO_APPROVED_MODEL,95,true,V0.5C/V0.6A,No registry-approved CHAMPION is available
+MODEL_INTEGRITY_FAILURE,94,true,V0.6A,Registry artifact SHA contract ordering or inference gate failed
+MALFORMED_PROBABILITIES,93,true,V0.6A,Probability vector is missing nonfinite negative or zero-mass
+STALE_MARKET_DATA,90,true,V0.5A,Latest completed market row is stale unavailable or future-dated
+STALE_MODEL_DATA,89,true,V0.5C/V0.6A,Inference output is stale or approved artifact is older than 45 days
+EVENT_DATA_INCOMPLETE,87,true,V0.4D,Exact target calendar coverage is stale unavailable or incomplete
+EVENT_BLOCK_WINDOW,86,true,V0.4D,Exact target event is in BLOCK or post-release volatility window
+EXTREME_SPREAD,84,true,V0.5A,Spread is wide extreme or invalid relative to recent median
+EXTREME_VOLATILITY,83,true,V0.5A,Volatility exceeds the causal prior q95 threshold
+INSUFFICIENT_FEATURES,80,true,V0.5A,Full market/regime inputs are incomplete
+INSUFFICIENT_APPROVED_HORIZONS,79,true,V0.6A,Fewer than two approved horizons are valid
+HORIZON_DISAGREEMENT,77,true,V0.6A,Eligible approved horizons disagree directionally
+TRADE_WINDOW_TOO_SHORT,76,true,V0.6B,Remaining risk-truncated advisory window is shorter than 10 minutes
+LOW_DIRECTIONAL_CONFIDENCE,75,true,V0.6B,Fused top probability or margin misses threshold
+INTELLIGENCE_STALE,50,true,V0.5B,Context snapshot is stale and cannot support a directional advisory
+INTELLIGENCE_DEGRADED,45,false,V0.5B,Some context providers are unavailable; context is not an override
+MEMORY_UNAVAILABLE,30,false,V0.4B,Historical Event Memory diagnostic context is unavailable
+DIRECTIONAL_CONSENSUS,10,false,V0.6B,Approved horizons and all risk gates permit an advisory bias
