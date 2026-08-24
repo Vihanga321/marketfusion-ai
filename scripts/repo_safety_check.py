@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEXT_SUFFIXES = {
     ".py", ".java", ".xml", ".md", ".txt", ".json", ".yml", ".yaml",
-    ".toml", ".ini", ".cfg", ".properties", ".ps1", ".sh", ".csv",
+    ".toml", ".ini", ".cfg", ".properties", ".ps1", ".sh", ".csv", ".mq5",
 }
 
 # Match executable/API-use shapes rather than generic words. Several read-only
@@ -25,6 +25,8 @@ TEXT_SUFFIXES = {
 # very comments that explain the safety boundary.
 FORBIDDEN_TRADING_PATTERNS = {
     "MetaTrader5 order_send": re.compile(r"\b(?:mt5\s*\.\s*)?order_send\s*\(", re.IGNORECASE),
+    "MQL5 OrderSend": re.compile(r"\bOrderSend\s*\(", re.IGNORECASE),
+    "MQL5 CTrade": re.compile(r"\bCTrade\b|#include\s*<Trade/Trade\.mqh>", re.IGNORECASE),
     "JForex IEngine import": re.compile(r"^\s*import\s+com\.dukascopy\.api\.IEngine\s*;", re.MULTILINE),
     "JForex getEngine": re.compile(r"\bgetEngine\s*\("),
     "JForex submitOrder": re.compile(r"\bsubmitOrder\s*\("),
@@ -57,6 +59,7 @@ REQUIRED_GITIGNORE_LINES = {
     "data/provider_audit/",
     "data/mt5/ticks/",
     "data/mt5/history/",
+    "data/mt5/calendar/",
     "jforex-event-exporter/target/",
 }
 
@@ -126,6 +129,7 @@ def check_read_only_policy(files: list[Path], errors: list[str]) -> None:
         rel = path.relative_to(ROOT).as_posix()
         if not (
             rel.startswith("src/")
+            or rel.startswith("mql5/")
             or rel.startswith("jforex-event-exporter/src/main/java/")
         ):
             continue
