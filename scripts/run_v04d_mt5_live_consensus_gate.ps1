@@ -25,7 +25,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Live consensus gate tests failed' }
 
     Write-Host '[3/3] Verify server offset, exact target identity and strict pre-release timing'
-    & $Python src\events\mt5_live_consensus_gate.py --snapshot-audit $ResolvedSnapshotAudit
+    # Run as a package module so absolute imports such as
+    # `from src.events...` resolve from the repository root on Windows.
+    & $Python -m src.events.mt5_live_consensus_gate --snapshot-audit $ResolvedSnapshotAudit
     if ($LASTEXITCODE -ne 0) { throw 'Live MT5 consensus gate failed' }
 
     Write-Host '=== V0.4D LIVE MT5 CONSENSUS GATE COMPLETE (FAIL-CLOSED) ==='
