@@ -23,6 +23,7 @@ reports/marketfusion_mt5_connectivity.txt
 reports/v05b_free_source_network_diagnostics.txt
 reports/v05ab_local_integration_audit.txt
 reports/marketfusion_full_local_runtime_validation.txt
+models/v05c/
 jforex-event-exporter/target/
 .vscode/
 .idea/

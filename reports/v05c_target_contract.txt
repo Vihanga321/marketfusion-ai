@@ -1,0 +1,12 @@
+MARKETFUSION V0.5C TARGET CONTRACT
+contract_version: v0.5c-controlled-daily-learning-v1
+independent_horizons_minutes: 15, 60, 240
+raw_target: exact V0.5A matured forward return for the selected horizon
+decision_cost_band: max(decision m5_spread_points, 1.0) * 0.00001 * 1.25 / decision m5_close
+DOWN: raw forward return < -decision_cost_band
+NEUTRAL_NO_TRADE: -decision_cost_band <= raw forward return <= decision_cost_band
+UP: raw forward return > decision_cost_band
+future_spread_used: NO
+commission_status: UNKNOWN
+cost_aware_output_name: COST_AWARE_RESEARCH_METRIC
+profitability_claim: FORBIDDEN

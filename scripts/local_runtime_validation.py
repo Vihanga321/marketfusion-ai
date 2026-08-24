@@ -33,6 +33,16 @@ from src.intelligence.v05b_contract import (
     NEWS_SOURCES,
     STATUS_FILE as V05B_STATUS_FILE,
 )
+from src.learning.v05c_contract import (
+    CANDIDATE_REPORT as V05C_CANDIDATE_REPORT,
+    FEATURE_GROUP_REPORT as V05C_FEATURE_GROUP_REPORT,
+    HORIZONS as V05C_HORIZONS,
+    MODEL_REGISTRY_REPORT as V05C_MODEL_REGISTRY_REPORT,
+    RUNTIME_REGISTRY as V05C_RUNTIME_REGISTRY,
+    TRAINING_QUALITY_REPORT as V05C_TRAINING_REPORT,
+    WALK_FORWARD_REPORT as V05C_WALK_REPORT,
+)
+from src.learning.v05c_registry import load_registry as load_v05c_registry, validate_registry as validate_v05c_registry
 from src.marketdata.v05a_contract import (
     CONFLICT_DIR,
     FEATURE_COLUMNS,
@@ -427,16 +437,56 @@ def _mt5_report_values() -> dict[str, str]:
     return values
 
 
+def _v05c_audit() -> tuple[dict[str, object], list[str]]:
+    failures: list[str] = []
+    dataset_gate = "PASS" if FEATURE_FILE.exists() else "FAIL"
+    feature_group_gate = "PASS" if V05C_FEATURE_GROUP_REPORT.exists() else "FAIL"
+    walk_status = "FAIL"
+    if V05C_WALK_REPORT.exists():
+        walk = pd.read_csv(V05C_WALK_REPORT)
+        walk_status = "PASS" if len(walk) and int(pd.to_numeric(walk["future_violation"], errors="coerce").fillna(1).sum()) == 0 else "FAIL"
+    registry_status = "PASS_EMPTY"
+    records: list[dict[str, object]] = []
+    try:
+        records = load_v05c_registry(V05C_RUNTIME_REGISTRY)
+        if records:
+            validate_v05c_registry(records)
+            registry_status = "PASS"
+    except Exception as exc:
+        registry_status = "FAIL"
+        failures.append(f"V0.5C registry integrity: {type(exc).__name__}")
+    champions = {
+        horizon: next((str(record["model_id"]) for record in reversed(records) if int(record["horizon_minutes"]) == horizon and record["promotion_status"] == "CHAMPION"), "NONE")
+        for horizon in V05C_HORIZONS
+    }
+    training_status = "INSUFFICIENT_DATA"
+    if V05C_TRAINING_REPORT.exists():
+        for line in V05C_TRAINING_REPORT.read_text(encoding="utf-8").splitlines():
+            if line.startswith("V05C_STATUS:"):
+                training_status = line.split(":", 1)[1].strip()
+    for name, value in (("dataset_gate", dataset_gate), ("feature_group_gate", feature_group_gate), ("walk_forward_engine", walk_status)):
+        if value == "FAIL":
+            failures.append(f"V0.5C {name} failed")
+    if registry_status == "FAIL":
+        failures.append("V0.5C model registry integrity failed")
+    return {
+        "dataset_gate": dataset_gate, "feature_group_gate": feature_group_gate,
+        "walk_forward_engine": walk_status, "registry_integrity": registry_status,
+        "champions": champions, "training_status": training_status,
+    }, failures
+
+
 def full_audit(args: argparse.Namespace) -> int:
     v05a, failures_a = _v05a_audit()
     v04d, failures_d = _v04d_audit(args.v04d)
     v05b, failures_b = _v05b_audit()
     integration, failures_i = _integration_audit()
+    v05c, failures_c = _v05c_audit()
     mt5 = _mt5_report_values()
-    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "mt5", "v05a_cycle", "v05b_cycle") if getattr(args, name) != "PASS"]
+    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "mt5", "v05a_cycle", "v05b_cycle") if getattr(args, name) != "PASS"]
     if args.v04d == "FAIL":
         stage_failures.append("v04d")
-    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i
+    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c
     degraded = v05b["status"] == "PASS_DEGRADED"
     final = "FAIL" if blockers else ("PASS_DEGRADED_EXTERNAL_PROVIDERS" if degraded else "PASS")
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
@@ -459,6 +509,10 @@ def full_audit(args: argparse.Namespace) -> int:
         f"news_sources_degraded: {', '.join(v05b['news_degraded']) or 'NONE'}", f"macro_sources_ok: {v05b['macro_ok']}",
         f"macro_sources_degraded: {', '.join(v05b['macro_degraded']) or 'NONE'}", f"news_rows: {v05b['news_rows']}",
         f"macro_rows: {v05b['macro_rows']}", f"context_rows: {v05b['context_rows']}", "",
+        "V0.5C:", f"dataset_gate: {v05c['dataset_gate']}", f"feature_group_gate: {v05c['feature_group_gate']}",
+        f"walk_forward_engine: {v05c['walk_forward_engine']}", f"model_registry_integrity: {v05c['registry_integrity']}",
+        f"champion_15m: {v05c['champions'][15]}", f"champion_60m: {v05c['champions'][60]}",
+        f"champion_240m: {v05c['champions'][240]}", f"training_status: {v05c['training_status']}", "",
         "INTEGRATION:", f"market_plus_intelligence_join: {integration['status']}",
         f"future_information_violations: {integration['future']}", f"outcome_feature_leaks: {integration['leaks']}", "",
         "FINAL_STATUS:", final, "", "BLOCKERS:", *(blockers or ["NONE"]), "", "NEXT_SAFE_STEP:", next_step,
@@ -501,7 +555,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("mt5")
     sub.add_parser("providers")
     audit = sub.add_parser("audit")
-    for name in ("repo_safety", "v05a_tests", "v05b_tests", "mt5", "v05a_cycle", "v05b_cycle"):
+    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "mt5", "v05a_cycle", "v05b_cycle"):
         audit.add_argument(f"--{name.replace('_', '-')}", choices=("PASS", "FAIL"), required=True)
     audit.add_argument("--v04d", choices=("PASS", "FAIL", "SKIPPED"), required=True)
     return result

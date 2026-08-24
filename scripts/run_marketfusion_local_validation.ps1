@@ -38,6 +38,8 @@ try {
     $RepoSafety = Invoke-MarketFusionStage '1. Repository safety' { & $Python scripts\repo_safety_check.py }
     $V05ATests = Invoke-MarketFusionStage '2. V0.5A deterministic tests' { & (Join-Path $PSScriptRoot 'run_v05a_tests.ps1') }
     $V05BTests = Invoke-MarketFusionStage '3. V0.5B deterministic tests' { & (Join-Path $PSScriptRoot 'run_v05b_tests.ps1') }
+    $V05CTests = Invoke-MarketFusionStage '3c. V0.5C lightweight deterministic validation' { & (Join-Path $PSScriptRoot 'run_v05c_tests.ps1') }
+    $null = Invoke-MarketFusionStage '3d. V0.5C status (no training)' { & (Join-Path $PSScriptRoot 'show_v05c_status.ps1') }
     $Mt5 = Invoke-MarketFusionStage '4. Read-only MT5 connectivity' { & $Python scripts\local_runtime_validation.py mt5 }
     $V05ACycle = Invoke-MarketFusionStage '5. V0.5A one-cycle validation' { & (Join-Path $PSScriptRoot 'run_v05a_once.ps1') }
 
@@ -68,6 +70,7 @@ try {
         --repo-safety $RepoSafety `
         --v05a-tests $V05ATests `
         --v05b-tests $V05BTests `
+        --v05c-tests $V05CTests `
         --mt5 $Mt5 `
         --v05a-cycle $V05ACycle `
         --v04d $V04D `

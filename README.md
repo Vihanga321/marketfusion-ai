@@ -300,6 +300,27 @@ Generated Parquet datasets remain ignored by Git:
 
 Readable V0.4C reports document the fingerprint, values, schema, source coverage, decision registries, enriched memory, surprise coverage, and insufficient-sample audit under `reports/`.
 
+## V0.5C Controlled Daily Learning
+
+V0.5C is an offline, research-only champion/challenger system for independent 15, 60, and 240 minute EUR/USD targets. It trains only on exact matured V0.5A labels, uses the explicit MARKET_CORE feature registry, and applies purged chronological expanding-window validation. V0.5B intelligence, event memory, and live surprise groups remain disabled until their configurable history and independent chronological-validation gates pass; current information is never backfilled into historical rows.
+
+Run the controlled daily cycle only when a deliberate retraining run is wanted:
+
+```powershell
+.\scripts\run_v05c_daily_training.ps1
+```
+
+The daily command does not require MT5 when sufficient completed local V0.5A data already exists. It evaluates logistic regression, histogram gradient boosting, and XGBoost when available, along with causal majority/recent-direction/momentum/mean-reversion baselines. Probability calibration uses a purged temporal holdout inside each training fold. Promotion additionally requires at least 90 calendar days, baseline margins, acceptable recent/worst-fold stability, calibration, and a non-degraded cost-aware research metric. A successful run may therefore end with `PASS_RESEARCH_ONLY` and no champion.
+
+Lightweight deterministic validation and status do not retrain models:
+
+```powershell
+.\scripts\run_v05c_tests.ps1
+.\scripts\show_v05c_status.ps1
+```
+
+Runtime artifacts and the JSON registry live under ignored `models/v05c/`. Tracked CSV/text reports under `reports/v05c_*` contain feature/target contracts, fold boundaries, calibration bins, stability slices, candidate results, and artifact fingerprints. The cost-aware metric uses only decision-time spread and is not a profitability claim; broker commission remains explicitly `UNKNOWN`.
+
 ## Project preflight and CI
 
 A local preflight checks Python syntax, unit tests, repository secret hygiene, the read-only trading boundary, all PowerShell syntax, event-table validation when local data exist, Java 8 compilation, and synthetic tick-reconstruction tests:
