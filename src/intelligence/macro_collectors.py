@@ -8,7 +8,6 @@ older observation.
 from __future__ import annotations
 
 import io
-from datetime import timedelta
 
 import pandas as pd
 import requests
@@ -50,7 +49,13 @@ def parse_fred_graph_csv(text: str, series_name: str, captured_at: pd.Timestamp)
 
 def fetch_fred_graph(series_name: str, captured_at: pd.Timestamp, session: requests.Session) -> pd.DataFrame:
     spec = MACRO_SOURCES[series_name]
-    response = session.get(spec["url"], timeout=30, headers={"User-Agent": USER_AGENT})
+    start = (captured_at - pd.Timedelta(days=45)).date().isoformat()
+    response = session.get(
+        spec["url"],
+        params={"cosd": start},
+        timeout=30,
+        headers={"User-Agent": USER_AGENT},
+    )
     response.raise_for_status()
     return parse_fred_graph_csv(response.text, series_name, captured_at)
 
