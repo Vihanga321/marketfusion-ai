@@ -15,33 +15,13 @@ from pathlib import Path
 import pandas as pd
 
 
-# Exact identities observed in the first real 2015-2026 MetaQuotes-Demo export.
-# These remain AUDIT CANDIDATES until units/reference-period/actual-value checks pass.
 TARGET_EVENT_IDS: dict[int, dict[str, str]] = {
-    840030007: {
-        "measure_id": "headline_cpi_yoy_sa",
-        "event_code": "consumer-price-index-yy",
-        "event_name": "CPI y/y",
-    },
-    840030008: {
-        "measure_id": "core_cpi_yoy_sa",
-        "event_code": "consumer-price-index-ex-food-energy-yy",
-        "event_name": "Core CPI y/y",
-    },
-    840030015: {
-        "measure_id": "unemployment_rate",
-        "event_code": "unemployment-rate",
-        "event_name": "Unemployment Rate",
-    },
-    840030016: {
-        "measure_id": "nonfarm_payroll_change",
-        "event_code": "nonfarm-payrolls",
-        "event_name": "Nonfarm Payrolls",
-    },
+    840030007: {"measure_id": "headline_cpi_yoy_sa", "event_code": "consumer-price-index-yy", "event_name": "CPI y/y"},
+    840030008: {"measure_id": "core_cpi_yoy_sa", "event_code": "consumer-price-index-ex-food-energy-yy", "event_name": "Core CPI y/y"},
+    840030015: {"measure_id": "unemployment_rate", "event_code": "unemployment-rate", "event_name": "Unemployment Rate"},
+    840030016: {"measure_id": "nonfarm_payroll_change", "event_code": "nonfarm-payrolls", "event_name": "Nonfarm Payrolls"},
 }
 
-# Similar names that the broad discovery classifier correctly surfaced but which are
-# not the four MarketFusion measures and must never be silently substituted.
 REJECTED_VARIANT_EVENT_IDS: dict[int, str] = {
     840030024: "U6 unemployment rate is not U-3 unemployment rate",
     840030023: "Private Nonfarm Payrolls is not Total Nonfarm Payrolls",
@@ -64,7 +44,9 @@ def _read(path: Path) -> pd.DataFrame:
     for column in ("actual_value", "forecast_value", "prev_value", "revised_prev_value"):
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     for column in ("event_time_server", "reference_period_server"):
-        frame[column] = pd.to_datetime(frame[column], errors="raise")
+        # Export/audit CSVs can contain both date-only strings and full timestamps.
+        # Parse each value independently so pandas does not lock onto the first format.
+        frame[column] = pd.to_datetime(frame[column], errors="raise", format="mixed")
     return frame
 
 
@@ -124,9 +106,6 @@ def audit_identity(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def _month_key(series: pd.Series) -> pd.Series:
-    # V0.4C reference periods can contain a mix of date-only and timestamp strings.
-    # Parse each value independently instead of letting pandas lock onto the first
-    # observed string format and reject later valid rows with a time component.
     values = pd.to_datetime(series, utc=True, errors="raise", format="mixed")
     return values.dt.strftime("%Y-%m")
 
@@ -147,7 +126,6 @@ def compare_with_v04c(frame: pd.DataFrame, v04c_path: Path) -> pd.DataFrame:
     for event_id, expected in TARGET_EVENT_IDS.items():
         mt5 = frame.loc[frame["event_id"].eq(event_id), ["reference_period_server", "actual_value"]].copy()
         mt5["measure_id"] = expected["measure_id"]
-        # Reference-period month is calendar identity, not a broker-time-to-UTC conversion.
         mt5["reference_month"] = mt5["reference_period_server"].dt.strftime("%Y-%m")
         mt5 = mt5.rename(columns={"actual_value": "mt5_actual_value"})
         rhs = v04c.loc[v04c["measure_id"].eq(expected["measure_id"]), ["reference_month", "actual_value"]].copy()
