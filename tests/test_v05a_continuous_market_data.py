@@ -7,6 +7,7 @@ import pandas as pd
 
 from src.marketdata.mt5_continuous_store import merge_immutable_bars, quote_to_frame, rates_to_completed_frame
 from src.marketdata.v05a_contract import FEATURE_COLUMNS, TIMEFRAMES
+from src.marketdata.v05a_daily_history import build_daily_history, finalized_daily_history
 from src.marketdata.v05a_dataset import build_dataset_from_frames, model_feature_view
 from src.marketdata.v05a_quality import build_quality_report
 
@@ -98,6 +99,15 @@ class V05AContinuousMarketDataTests(unittest.TestCase):
         view = model_feature_view(dataset)
         self.assertEqual(set(FEATURE_COLUMNS).issubset(view.columns), True)
         self.assertFalse(any(column.startswith("outcome_") for column in view.columns))
+
+    def test_daily_history_finalizes_only_prior_utc_days(self):
+        frames = self._frames()
+        now = pd.Timestamp(frames["M5"]["bar_close_utc"].iloc[-1]) + pd.Timedelta(minutes=1)
+        daily = build_daily_history(frames["M5"], now)
+        self.assertEqual(daily["day_status"].iloc[-1], "PROVISIONAL_CURRENT_UTC_DAY")
+        finalized = finalized_daily_history(daily)
+        self.assertTrue((finalized["day_status"] == "FINALIZED_UTC_DAY").all())
+        self.assertLess(len(finalized), len(daily))
 
     def test_quality_gate_passes_causal_synthetic_data(self):
         frames = self._frames()
