@@ -1,10 +1,19 @@
 #property strict
 
 input int InpSnapshotSeconds = 300;
-input int InpLookaheadHours = 48;
+input int InpLookaheadHours = 336;
+input bool InpTargetsOnly = true;
 input string InpCountryCode = "US";
 input string InpCurrency = "USD";
 input string InpOutputFile = "marketfusion_mt5_calendar_snapshots.tsv";
+
+bool IsTargetEventId(const ulong event_id)
+  {
+   return event_id==840030007 || // CPI y/y
+          event_id==840030008 || // Core CPI y/y
+          event_id==840030015 || // Unemployment Rate (U-3)
+          event_id==840030016;   // Total Nonfarm Payrolls
+  }
 
 string TimeField(const datetime value)
   {
@@ -92,9 +101,17 @@ void CaptureSnapshot()
       return;
      }
 
+   int target_rows=0;
    int written=0;
+   int forecast_rows=0;
    for(int i=0;i<total;i++)
      {
+      bool is_target=IsTargetEventId(values[i].event_id);
+      if(is_target)
+         target_rows++;
+      if(InpTargetsOnly && !is_target)
+         continue;
+
       MqlCalendarEvent event;
       MqlCalendarCountry country;
       ZeroMemory(event);
@@ -119,6 +136,9 @@ void CaptureSnapshot()
       if(digits<0) digits=0;
       if(digits>8) digits=8;
 
+      if(values[i].HasForecastValue())
+         forecast_rows++;
+
       FileWrite(handle,
                 StringFormat("%I64u",values[i].id),
                 StringFormat("%I64u",values[i].event_id),
@@ -138,7 +158,8 @@ void CaptureSnapshot()
 
    FileFlush(handle);
    FileClose(handle);
-   PrintFormat("MarketFusion calendar snapshot: %d rows captured at %s GMT",written,UtcIso(captured_gmt));
+   PrintFormat("MarketFusion target snapshot: queried=%d target=%d written=%d forecasts=%d lookahead=%dh captured=%s GMT",
+               total,target_rows,written,forecast_rows,InpLookaheadHours,UtcIso(captured_gmt));
   }
 
 int OnInit()
@@ -147,7 +168,7 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    EventSetTimer(InpSnapshotSeconds);
    CaptureSnapshot();
-   Print("MarketFusionCalendarSnapshotEA started. It only reads the economic calendar and writes snapshots; it does not trade.");
+   Print("MarketFusionCalendarSnapshotEA started. Read-only target calendar collector; it does not trade.");
    return INIT_SUCCEEDED;
   }
 
