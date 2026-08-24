@@ -12,7 +12,6 @@ import pandas as pd
 from src.marketdata.mt5_continuous_store import (
     Mt5ReadOnlySession,
     append_quote_partition,
-    read_bar_store,
     sync_timeframe,
 )
 from src.marketdata.v05a_contract import (
@@ -24,6 +23,7 @@ from src.marketdata.v05a_contract import (
     SYMBOL,
     TIMEFRAMES,
 )
+from src.marketdata.v05a_daily_history import build_and_save_daily_history, finalized_daily_history
 from src.marketdata.v05a_dataset import build_and_save_dataset, load_continuous_frames
 from src.marketdata.v05a_quality import build_quality_report, write_quality_report
 
@@ -79,13 +79,15 @@ def run_cycle(session: Mt5ReadOnlySession, overlap_bars: int = DEFAULT_OVERLAP_B
         or previous_status.get("last_dataset_decision_utc") != latest_m5
         or int(sync_results["M5"]["new_rows"]) > 0
     )
+    frames = load_continuous_frames()
     if rebuild:
         dataset = build_and_save_dataset()
+        daily = build_and_save_daily_history(frames["M5"], now_utc=captured)
     else:
         dataset = pd.read_parquet(FEATURE_FILE, engine="pyarrow")
         dataset["decision_timestamp_utc"] = pd.to_datetime(dataset["decision_timestamp_utc"], utc=True)
+        daily = build_and_save_daily_history(frames["M5"], now_utc=captured)
 
-    frames = load_continuous_frames()
     quality = build_quality_report(frames, dataset, pd.Timestamp(captured))
     write_quality_report(quality)
     if not quality.passed:
@@ -104,8 +106,9 @@ def run_cycle(session: Mt5ReadOnlySession, overlap_bars: int = DEFAULT_OVERLAP_B
         f"{minutes}m": int(dataset[f"outcome_future_return_{minutes}m"].notna().sum())
         for minutes in (15, 60, 240)
     }
+    final_daily = finalized_daily_history(daily)
     payload = {
-        "status": "PASS_RUNNING" if quality.passed else "FAIL",
+        "status": "PASS_RUNNING",
         "captured_at_utc": captured.isoformat(),
         "symbol": SYMBOL,
         "read_only": True,
@@ -118,6 +121,9 @@ def run_cycle(session: Mt5ReadOnlySession, overlap_bars: int = DEFAULT_OVERLAP_B
         "dataset_rows": len(dataset),
         "feature_complete_rows": feature_complete,
         "matured_label_rows": label_counts,
+        "daily_history_rows": len(daily),
+        "finalized_daily_history_rows": len(final_daily),
+        "latest_daily_status": str(daily["day_status"].iloc[-1]) if len(daily) else None,
         "last_dataset_decision_utc": (
             pd.Timestamp(dataset["decision_timestamp_utc"].iloc[-1]).isoformat() if len(dataset) else None
         ),
@@ -144,6 +150,7 @@ def print_summary(payload: dict[str, object]) -> None:
     print(f"dataset_rows: {payload['dataset_rows']}")
     print(f"feature_complete_rows: {payload['feature_complete_rows']}")
     print(f"matured_label_rows: {payload['matured_label_rows']}")
+    print(f"daily_history_rows: {payload['daily_history_rows']} finalized={payload['finalized_daily_history_rows']}")
     print(f"dataset_rebuilt_this_cycle: {payload['dataset_rebuilt_this_cycle']}")
     print("trading: DISABLED / NOT IMPLEMENTED")
     print("V05A_STATUS: PASS")
