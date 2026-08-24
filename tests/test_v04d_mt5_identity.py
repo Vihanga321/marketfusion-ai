@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
@@ -8,6 +10,7 @@ from src.events.mt5_calendar_identity_audit import (
     REJECTED_VARIANT_EVENT_IDS,
     TARGET_EVENT_IDS,
     _month_key,
+    _read,
     audit_identity,
 )
 
@@ -79,6 +82,23 @@ class V04DMt5IdentityTests(unittest.TestCase):
             "2024-03-01T00:00:00+00:00",
         ]))
         self.assertEqual(result.tolist(), ["2024-01", "2024-02", "2024-03"])
+
+    def test_reader_accepts_mixed_mt5_datetime_formats(self):
+        rows = [
+            _row(840030007, "consumer-price-index-yy", "CPI y/y"),
+            _row(840030007, "consumer-price-index-yy", "CPI y/y"),
+        ]
+        rows[0]["event_time_server"] = "2024-01-11"
+        rows[0]["reference_period_server"] = "2023-12-01"
+        rows[1]["event_time_server"] = "2024-02-13 15:30:00"
+        rows[1]["reference_period_server"] = "2024-01-01 00:00:00"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "history.csv"
+            pd.DataFrame(rows).to_csv(path, index=False)
+            frame = _read(path)
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(frame["event_time_server"]))
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(frame["reference_period_server"]))
+        self.assertEqual(frame["event_time_server"].dt.strftime("%Y-%m-%d").tolist(), ["2024-01-11", "2024-02-13"])
 
 
 if __name__ == "__main__":
