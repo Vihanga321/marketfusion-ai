@@ -154,8 +154,14 @@ def fetch_rss(source_id: str, captured_at: pd.Timestamp, session: requests.Sessi
     client = session or requests.Session()
     response = client.get(spec["url"], timeout=(10, 30), headers=RSS_HEADERS)
     response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "").lower()
+    if not any(token in content_type for token in ("xml", "rss", "atom")):
+        raise ValueError(f"RSS endpoint returned unexpected Content-Type: {content_type or 'missing'}")
     # Parse bytes so XML encoding declarations/BOMs remain authoritative.
-    return parse_rss_xml(response.content, source_id, captured_at)
+    frame = parse_rss_xml(response.content, source_id, captured_at)
+    if frame.empty:
+        raise ValueError("RSS endpoint returned XML without any feed items")
+    return frame
 
 
 def parse_gdelt_json(payload: dict, captured_at: pd.Timestamp) -> pd.DataFrame:
@@ -205,8 +211,13 @@ def fetch_gdelt(captured_at: pd.Timestamp, session: requests.Session | None = No
         headers=JSON_HEADERS,
     )
     if response.status_code == 429:
-        raise RuntimeError("GDELT rate limited this cycle; collector will retry later")
+        retry_after = response.headers.get("Retry-After")
+        suffix = f"; Retry-After={retry_after}" if retry_after else ""
+        raise RuntimeError(f"GDELT rate limited this cycle; collector will retry later{suffix}")
     response.raise_for_status()
+    content_type = response.headers.get("Content-Type", "").lower()
+    if "json" not in content_type:
+        raise ValueError(f"GDELT returned unexpected Content-Type: {content_type or 'missing'}")
     return parse_gdelt_json(response.json(), captured_at)
 
 

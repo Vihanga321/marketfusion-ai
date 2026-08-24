@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import unittest
+from argparse import Namespace
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import Mock, patch
 
 import pandas as pd
 
 from src.intelligence.features import build_context_snapshot, model_feature_view
-from src.intelligence.macro_collectors import parse_ecb_csv, parse_fred_graph_csv
-from src.intelligence.news_collectors import classify_text, parse_gdelt_json, parse_rss_xml
+from src.intelligence.macro_collectors import fetch_fred_graph, parse_ecb_csv, parse_fred_graph_csv
+from src.intelligence.news_collectors import classify_text, fetch_rss, parse_gdelt_json, parse_rss_xml
 from src.intelligence.quality import build_quality_report
 from src.intelligence.store import merge_macro, merge_news
+from src.intelligence.v05b_runner import main
 
 
 CAPTURE = pd.Timestamp("2026-08-24T10:00:00Z")
@@ -57,6 +62,20 @@ class V05BContinuousIntelligenceTests(unittest.TestCase):
         frame = parse_ecb_csv(csv, "ecb_main_refinancing_rate", CAPTURE)
         self.assertEqual(frame.loc[0, "available_from_utc"], CAPTURE)
 
+    def test_collectors_reject_html_or_challenge_payloads(self):
+        response = Mock()
+        response.headers = {"Content-Type": "text/html"}
+        response.content = b"<html><body>challenge</body></html>"
+        response.text = response.content.decode()
+        response.status_code = 200
+        response.raise_for_status.return_value = None
+        session = Mock()
+        session.get.return_value = response
+        with self.assertRaisesRegex(ValueError, "unexpected Content-Type"):
+            fetch_rss("FED_MONETARY", CAPTURE, session)
+        with self.assertRaisesRegex(ValueError, "unexpected Content-Type"):
+            fetch_fred_graph("us_2y_yield", CAPTURE, session)
+
     def test_macro_revisions_are_append_only(self):
         first = parse_fred_graph_csv("DATE,DGS10\n2026-08-24,4.20\n", "us_10y_yield", CAPTURE)
         revised = parse_fred_graph_csv("DATE,DGS10\n2026-08-24,4.21\n", "us_10y_yield", CAPTURE + pd.Timedelta(minutes=5))
@@ -101,6 +120,16 @@ class V05BContinuousIntelligenceTests(unittest.TestCase):
         context = build_context_snapshot(news, macro, CAPTURE)
         result = build_quality_report(news, macro, context, CAPTURE)
         self.assertTrue(result.passed, result.report)
+
+    def test_continuous_runner_ctrl_c_exits_cleanly(self):
+        output = StringIO()
+        with (
+            patch("src.intelligence.v05b_runner.arguments", return_value=Namespace(once=False, interval=60)),
+            patch("src.intelligence.v05b_runner.run_cycle", side_effect=KeyboardInterrupt),
+            redirect_stdout(output),
+        ):
+            main()
+        self.assertIn("V0.5B stopped by user. Stored history remains intact.", output.getvalue())
 
 
 if __name__ == "__main__":

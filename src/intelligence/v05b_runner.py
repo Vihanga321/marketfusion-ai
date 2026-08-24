@@ -106,21 +106,22 @@ def arguments() -> argparse.Namespace:
 
 def main() -> None:
     args = arguments()
-    if args.once:
-        result = run_cycle()
-        if str(result["status"]).startswith("FAIL"):
-            raise SystemExit(1)
-        return
-    interval = max(60, int(args.interval))
-    print(f"Starting V0.5B continuous intelligence every {interval}s. Ctrl+C to stop.")
-    while True:
-        try:
-            run_cycle()
-        except KeyboardInterrupt:
-            raise
-        except Exception as exc:
-            print(f"V0.5B cycle error: {type(exc).__name__}: {exc}")
-        time.sleep(interval)
+    try:
+        if args.once:
+            result = run_cycle()
+            if str(result["status"]).startswith("FAIL"):
+                raise SystemExit(1)
+            return
+        interval = max(60, int(args.interval))
+        print(f"Starting V0.5B continuous intelligence every {interval}s. Ctrl+C to stop.")
+        while True:
+            try:
+                run_cycle()
+            except Exception as exc:
+                print(f"V0.5B cycle error: {type(exc).__name__}: {exc}")
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("V0.5B stopped by user. Stored history remains intact.")
 
 
 if __name__ == "__main__":

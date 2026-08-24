@@ -19,6 +19,12 @@ from .v05b_contract import MACRO_SOURCES
 USER_AGENT = "MarketFusionAI/0.5B research collector"
 
 
+def _require_csv_response(response: requests.Response, provider: str) -> None:
+    content_type = response.headers.get("Content-Type", "").lower()
+    if not any(token in content_type for token in ("csv", "text/plain", "octet-stream")):
+        raise ValueError(f"{provider} returned unexpected Content-Type: {content_type or 'missing'}")
+
+
 def utc_now() -> pd.Timestamp:
     return pd.Timestamp.now(tz="UTC")
 
@@ -82,6 +88,7 @@ def fetch_fred_graph(series_name: str, captured_at: pd.Timestamp, session: reque
         },
     )
     response.raise_for_status()
+    _require_csv_response(response, "FRED")
     return parse_fred_graph_csv(response.text, series_name, captured_at)
 
 
@@ -122,6 +129,7 @@ def fetch_ecb(series_name: str, captured_at: pd.Timestamp, session: requests.Ses
         headers={"User-Agent": USER_AGENT, "Accept": "text/csv, */*;q=0.2"},
     )
     response.raise_for_status()
+    _require_csv_response(response, "ECB SDMX")
     return parse_ecb_csv(response.text, series_name, captured_at)
 
 
