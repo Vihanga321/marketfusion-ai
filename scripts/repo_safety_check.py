@@ -19,10 +19,6 @@ TEXT_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".properties", ".ps1", ".sh", ".csv", ".mq5",
 }
 
-# Match executable/API-use shapes rather than generic words. Several read-only
-# Java classes deliberately mention "IEngine" in comments to document that they
-# never obtain it; matching the bare word would make the safety check fail on the
-# very comments that explain the safety boundary.
 FORBIDDEN_TRADING_PATTERNS = {
     "MetaTrader5 order_send": re.compile(r"\b(?:mt5\s*\.\s*)?order_send\s*\(", re.IGNORECASE),
     "MQL5 OrderSend": re.compile(r"\bOrderSend\s*\(", re.IGNORECASE),
@@ -33,68 +29,37 @@ FORBIDDEN_TRADING_PATTERNS = {
     "direct Dukascopy BI5 scraping": re.compile(r"https?://[^\s\"']+\.bi5\b", re.IGNORECASE),
 }
 
-# High-signal credential assignment forms. Horizontal whitespace is used around
-# '=' deliberately: '\\s*' would cross a newline after an empty value such as
-# BLS_API_KEY= and incorrectly consume the next Markdown/code-fence line.
 CREDENTIAL_ASSIGNMENT = re.compile(
     r"(?im)^[ \t]*(FRED_API_KEY|BLS_API_KEY|OANDA_API_TOKEN|OANDA_ACCOUNT_ID|"
     r"DUKASCOPY_USER|DUKASCOPY_PASSWORD|TRADING_ECONOMICS_API_KEY)[ \t]*=[ \t]*"
     r"([^#\r\n]*)[ \t]*$"
 )
 ALLOWED_PLACEHOLDER_FRAGMENTS = (
-    "replace_with_",
-    "your_private_",
-    "your_personal_",
-    "your_v20_",
-    "your_trading_economics_",
-    "...",
+    "replace_with_", "your_private_", "your_personal_", "your_v20_",
+    "your_trading_economics_", "...",
 )
 
 REQUIRED_GITIGNORE_LINES = {
-    ".env",
-    ".env.*",
-    "!.env.example",
-    "*.parquet",
-    "data/dukascopy/",
-    "data/provider_audit/",
-    "data/mt5/ticks/",
-    "data/mt5/history/",
-    "data/mt5/calendar/",
-    "data/mt5/continuous/",
-    "jforex-event-exporter/target/",
+    ".env", ".env.*", "!.env.example", "*.parquet",
+    "data/dukascopy/", "data/provider_audit/", "data/mt5/ticks/",
+    "data/mt5/history/", "data/mt5/calendar/", "data/mt5/continuous/",
+    "data/intelligence/", "jforex-event-exporter/target/",
 }
 
 
 def run_git(*args: str) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    completed = subprocess.run(["git", *args], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"git {' '.join(args)} failed ({completed.returncode}): "
-            f"{completed.stderr.strip()}"
-        )
+        raise RuntimeError(f"git {' '.join(args)} failed ({completed.returncode}): {completed.stderr.strip()}")
     return completed.stdout
 
 
 def tracked_files() -> list[Path]:
-    files: list[Path] = []
-    for raw in run_git("ls-files").splitlines():
-        raw = raw.strip()
-        if raw:
-            files.append(ROOT / raw)
-    return files
+    return [ROOT / raw.strip() for raw in run_git("ls-files").splitlines() if raw.strip()]
 
 
 def is_text_candidate(path: Path) -> bool:
-    if path.name in {".gitignore", ".env.example"}:
-        return True
-    return path.suffix.lower() in TEXT_SUFFIXES
+    return path.name in {".gitignore", ".env.example"} or path.suffix.lower() in TEXT_SUFFIXES
 
 
 def check_tracked_secret_files(files: list[Path], errors: list[str]) -> None:
@@ -119,20 +84,14 @@ def check_credential_literals(files: list[Path], errors: list[str]) -> None:
         for match in CREDENTIAL_ASSIGNMENT.finditer(text):
             key = match.group(1)
             value = match.group(2).strip().strip("'\"")
-            lowered = value.lower()
-            if not value or any(fragment in lowered for fragment in ALLOWED_PLACEHOLDER_FRAGMENTS):
-                continue
-            errors.append(f"possible hard-coded credential {key} in {rel}")
+            if value and not any(fragment in value.lower() for fragment in ALLOWED_PLACEHOLDER_FRAGMENTS):
+                errors.append(f"possible hard-coded credential {key} in {rel}")
 
 
 def check_read_only_policy(files: list[Path], errors: list[str]) -> None:
     for path in files:
         rel = path.relative_to(ROOT).as_posix()
-        if not (
-            rel.startswith("src/")
-            or rel.startswith("mql5/")
-            or rel.startswith("jforex-event-exporter/src/main/java/")
-        ):
+        if not (rel.startswith("src/") or rel.startswith("mql5/") or rel.startswith("jforex-event-exporter/src/main/java/")):
             continue
         if not path.is_file() or not is_text_candidate(path):
             continue
@@ -150,11 +109,7 @@ def check_gitignore(errors: list[str]) -> None:
     if not path.is_file():
         errors.append("missing .gitignore")
         return
-    lines = {
-        line.strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    }
+    lines = {line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")}
     missing = sorted(REQUIRED_GITIGNORE_LINES.difference(lines))
     if missing:
         errors.append(".gitignore missing required entries: " + ", ".join(missing))
@@ -166,23 +121,19 @@ def main() -> int:
     except RuntimeError as exc:
         print(f"ERROR: {exc}")
         return 2
-
     errors: list[str] = []
     check_tracked_secret_files(files, errors)
     check_credential_literals(files, errors)
     check_read_only_policy(files, errors)
     check_gitignore(errors)
-
     print("MARKETFUSION REPOSITORY PREFLIGHT")
     print(f"Tracked files checked: {len(files)}")
     print("Policy: no trading execution code in the current research stage")
-
     if errors:
         print(f"STATUS: FAIL ({len(errors)} issue(s))")
         for error in errors:
             print(f"- {error}")
         return 1
-
     print("STATUS: PASS")
     print("- secret-file tracking guard: PASS")
     print("- hard-coded credential guard: PASS")
