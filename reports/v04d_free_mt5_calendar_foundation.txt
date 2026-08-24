@@ -1,0 +1,33 @@
+MARKETFUSION V0.4D FREE MT5 ECONOMIC CALENDAR FOUNDATION
+
+Purpose:
+Use the free MetaTrader 5 Economic Calendar rather than a paid consensus API.
+
+Implemented:
+- Historical US/USD MT5 calendar exporter.
+- Read-only future calendar snapshot EA.
+- Fail-closed Python importer/auditor.
+- Strict pre-release timestamp helper.
+- Historical forecast values remain point-in-time unverified.
+- Snapshot capture GMT is preserved, but event identity is not auto-approved.
+- Model-eligible consensus remains zero until event/measure/reference-period adjudication passes.
+- Focused Python tests cover candidate mapping, historical non-eligibility, snapshot capture semantics, and strict pre-release timing.
+- PowerShell audit runner added.
+
+Safety:
+- No order_send.
+- No trade execution.
+- No position modification.
+- No paid API key.
+- No fabricated consensus.
+- No broker-server-time-to-UTC assumption.
+
+Current status:
+V04D_FREE_MT5_CALENDAR_FOUNDATION: IMPLEMENTED
+CONSENSUS_MODEL_ELIGIBILITY: BLOCKED_PENDING_REAL_EXPORT_AND_IDENTITY_AUDIT
+
+Next local action:
+Compile and run mql5/MarketFusionCalendarExporter.mq5 in MT5, then pass the generated TSV to scripts/run_v04d_mt5_calendar_audit.ps1.
+
+Future forward-looking action:
+Attach mql5/MarketFusionCalendarSnapshotEA.mq5 so MarketFusion begins accumulating its own timestamped pre-release forecast archive at zero recurring API cost.
