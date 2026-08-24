@@ -29,11 +29,16 @@ def build_context_snapshot(news: pd.DataFrame, macro: pd.DataFrame, decision_tim
     else:
         eligible_news = news.copy()
         eligible_news["first_observed_utc"] = pd.to_datetime(eligible_news["first_observed_utc"], utc=True, errors="raise")
+        eligible_news["provider_published_utc"] = pd.to_datetime(eligible_news.get("provider_published_utc"), utc=True, errors="coerce")
         eligible_news = eligible_news.loc[eligible_news["first_observed_utc"] <= decision].copy()
+        provider_time = eligible_news["provider_published_utc"]
+        usable_provider_time = provider_time.notna() & (provider_time <= eligible_news["first_observed_utc"])
+        eligible_news["activity_timestamp_utc"] = eligible_news["first_observed_utc"]
+        eligible_news.loc[usable_provider_time, "activity_timestamp_utc"] = provider_time.loc[usable_provider_time]
 
     for minutes in NEWS_WINDOWS_MINUTES:
         start = decision - pd.Timedelta(minutes=minutes)
-        window = eligible_news.loc[eligible_news["first_observed_utc"] > start] if not eligible_news.empty else eligible_news
+        window = eligible_news.loc[eligible_news["activity_timestamp_utc"] > start] if not eligible_news.empty else eligible_news
         prefix = f"news_{minutes}m"
         row[f"{prefix}_count"] = int(len(window))
         if window.empty:
