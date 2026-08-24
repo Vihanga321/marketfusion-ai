@@ -100,10 +100,10 @@ class V05AContinuousMarketDataTests(unittest.TestCase):
         self.assertEqual(set(FEATURE_COLUMNS).issubset(view.columns), True)
         self.assertFalse(any(column.startswith("outcome_") for column in view.columns))
 
-    def test_daily_history_finalizes_only_prior_utc_days(self):
-        frames = self._frames()
-        now = pd.Timestamp(frames["M5"]["bar_close_utc"].iloc[-1]) + pd.Timedelta(minutes=1)
-        daily = build_daily_history(frames["M5"], now)
+    def test_daily_history_finalizes_prior_days_and_keeps_today_provisional(self):
+        m5 = synthetic_bars("2026-08-20T00:00:00Z", 36 * 12, 5)
+        now = pd.Timestamp(m5["bar_close_utc"].iloc[-1]) + pd.Timedelta(minutes=1)
+        daily = build_daily_history(m5, now)
         self.assertEqual(daily["day_status"].iloc[-1], "PROVISIONAL_CURRENT_UTC_DAY")
         finalized = finalized_daily_history(daily)
         self.assertTrue((finalized["day_status"] == "FINALIZED_UTC_DAY").all())
