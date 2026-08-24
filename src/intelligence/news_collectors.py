@@ -24,6 +24,15 @@ from .v05b_contract import (
 USER_AGENT = "MarketFusionAI/0.5B research collector"
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
+RSS_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.2",
+    "Cache-Control": "no-cache",
+}
+JSON_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/json, */*;q=0.2",
+}
 
 
 def utc_now() -> pd.Timestamp:
@@ -88,8 +97,26 @@ def _link(element: ET.Element) -> str:
     return ""
 
 
-def parse_rss_xml(xml_text: str, source_id: str, captured_at: pd.Timestamp) -> pd.DataFrame:
-    root = ET.fromstring(xml_text)
+def _parse_xml_root(xml_data: str | bytes) -> ET.Element:
+    """Parse RSS/Atom safely without forcing requests' guessed text encoding.
+
+    Federal Reserve feeds are standards-compliant XML but can be served with an
+    encoding declaration/BOM that is safer to let ElementTree decode from bytes.
+    Tests and local fixtures may still pass ordinary strings.
+    """
+    if isinstance(xml_data, bytes):
+        payload = xml_data.lstrip(b"\xef\xbb\xbf\x00\x20\x09\x0d\x0a")
+        if not payload.startswith(b"<"):
+            raise ValueError("RSS endpoint returned a non-XML payload")
+        return ET.fromstring(payload)
+    text = xml_data.lstrip("\ufeff\x00 \t\r\n")
+    if not text.startswith("<"):
+        raise ValueError("RSS endpoint returned a non-XML payload")
+    return ET.fromstring(text)
+
+
+def parse_rss_xml(xml_text: str | bytes, source_id: str, captured_at: pd.Timestamp) -> pd.DataFrame:
+    root = _parse_xml_root(xml_text)
     spec = NEWS_SOURCES[source_id]
     rows: list[dict[str, object]] = []
     candidates = [node for node in root.iter() if _local_name(node.tag) in {"item", "entry"}]
@@ -125,9 +152,10 @@ def parse_rss_xml(xml_text: str, source_id: str, captured_at: pd.Timestamp) -> p
 def fetch_rss(source_id: str, captured_at: pd.Timestamp, session: requests.Session | None = None) -> pd.DataFrame:
     spec = NEWS_SOURCES[source_id]
     client = session or requests.Session()
-    response = client.get(spec["url"], timeout=30, headers={"User-Agent": USER_AGENT})
+    response = client.get(spec["url"], timeout=(10, 30), headers=RSS_HEADERS)
     response.raise_for_status()
-    return parse_rss_xml(response.text, source_id, captured_at)
+    # Parse bytes so XML encoding declarations/BOMs remain authoritative.
+    return parse_rss_xml(response.content, source_id, captured_at)
 
 
 def parse_gdelt_json(payload: dict, captured_at: pd.Timestamp) -> pd.DataFrame:
@@ -168,14 +196,16 @@ def fetch_gdelt(captured_at: pd.Timestamp, session: requests.Session | None = No
         params={
             "query": GDELT_QUERY,
             "mode": "ArtList",
-            "maxrecords": 75,
-            "timespan": "6h",
+            "maxrecords": 25,
+            "timespan": "3h",
             "format": "json",
             "sort": "DateDesc",
         },
-        timeout=45,
-        headers={"User-Agent": USER_AGENT},
+        timeout=(10, 30),
+        headers=JSON_HEADERS,
     )
+    if response.status_code == 429:
+        raise RuntimeError("GDELT rate limited this cycle; collector will retry later")
     response.raise_for_status()
     return parse_gdelt_json(response.json(), captured_at)
 
