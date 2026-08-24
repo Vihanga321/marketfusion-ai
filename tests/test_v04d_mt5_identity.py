@@ -7,6 +7,7 @@ import pandas as pd
 from src.events.mt5_calendar_identity_audit import (
     REJECTED_VARIANT_EVENT_IDS,
     TARGET_EVENT_IDS,
+    _month_key,
     audit_identity,
 )
 
@@ -70,6 +71,14 @@ class V04DMt5IdentityTests(unittest.TestCase):
         identity, _ = audit_identity(pd.DataFrame([row]))
         item = identity.loc[identity["event_id"].eq(840030016)].iloc[0]
         self.assertEqual(item["identity_status"], "IDENTITY_REVIEW_REQUIRED")
+
+    def test_month_key_accepts_mixed_date_and_timestamp_strings(self):
+        result = _month_key(pd.Series([
+            "2024-01-01",
+            "2024-02-01 00:00:00",
+            "2024-03-01T00:00:00+00:00",
+        ]))
+        self.assertEqual(result.tolist(), ["2024-01", "2024-02", "2024-03"])
 
 
 if __name__ == "__main__":
