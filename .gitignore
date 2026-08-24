@@ -17,6 +17,7 @@ data/intelligence/
 data/inference/
 data/runtime/
 data/evaluation/
+data/research/
 *.pid
 *.lock
 data/processed/*.parquet

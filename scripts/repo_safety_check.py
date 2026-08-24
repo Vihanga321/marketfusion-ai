@@ -43,8 +43,9 @@ REQUIRED_GITIGNORE_LINES = {
     ".env", ".env.*", "!.env.example", "*.parquet",
     "data/dukascopy/", "data/provider_audit/", "data/mt5/ticks/",
     "data/mt5/history/", "data/mt5/calendar/", "data/mt5/continuous/",
-    "data/intelligence/", "data/inference/", "data/runtime/", "models/v05c/",
-    "*.pid", "*.lock", "jforex-event-exporter/target/",
+    "data/intelligence/", "data/inference/", "data/runtime/", "data/evaluation/",
+    "data/research/", "models/v05c/", "*.pid", "*.lock",
+    "jforex-event-exporter/target/",
 }
 
 
