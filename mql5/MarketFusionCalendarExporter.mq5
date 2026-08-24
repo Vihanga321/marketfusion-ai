@@ -6,6 +6,7 @@ input datetime InpTo = 0;
 input string InpCountryCode = "US";
 input string InpCurrency = "USD";
 input string InpOutputFile = "marketfusion_mt5_calendar_history.tsv";
+input int InpBatchDays = 30;
 
 string TimeField(const datetime value)
   {
@@ -43,25 +44,60 @@ string NumericField(const MqlCalendarValue &value,const int field,const int digi
    return DoubleToString(number,digits);
   }
 
+bool WriteCalendarRow(const int handle,const MqlCalendarValue &value,const datetime exported_at)
+  {
+   MqlCalendarEvent event;
+   MqlCalendarCountry country;
+   ZeroMemory(event);
+   ZeroMemory(country);
+   bool have_event=CalendarEventById(value.event_id,event);
+   bool have_country=false;
+   if(have_event)
+      have_country=CalendarCountryById(event.country_id,country);
+
+   string event_name=have_event ? event.name : "";
+   string event_code=have_event ? event.event_code : "";
+   string country_code=have_country ? country.code : InpCountryCode;
+   string currency=have_country ? country.currency : InpCurrency;
+   string unit=have_event ? EnumToString(event.unit) : "";
+   string importance=have_event ? EnumToString(event.importance) : "";
+   string multiplier=have_event ? EnumToString(event.multiplier) : "";
+   string time_mode=have_event ? EnumToString(event.time_mode) : "";
+   string sector=have_event ? EnumToString(event.sector) : "";
+   string frequency=have_event ? EnumToString(event.frequency) : "";
+   string source_url=have_event ? event.source_url : "";
+   int digits=have_event ? (int)event.digits : 8;
+   if(digits<0) digits=0;
+   if(digits>8) digits=8;
+
+   int fields=FileWrite(handle,
+                        StringFormat("%I64u",value.id),
+                        StringFormat("%I64u",value.event_id),
+                        TimeField(value.time),
+                        TimeField(value.period),
+                        IntegerToString(value.revision),
+                        NumericField(value,0,digits),
+                        NumericField(value,1,digits),
+                        NumericField(value,2,digits),
+                        NumericField(value,3,digits),
+                        EnumToString(value.impact_type),
+                        event_name,event_code,country_code,currency,unit,importance,multiplier,
+                        IntegerToString(digits),time_mode,sector,frequency,source_url,
+                        TimeField(exported_at));
+   return fields>0;
+  }
+
 void OnStart()
   {
-   if(InpTo!=0 && InpTo<=InpFrom)
+   datetime effective_to=(InpTo==0 ? TimeTradeServer() : InpTo);
+   if(effective_to<=InpFrom)
      {
-      Print("MarketFusion calendar exporter: InpTo must be later than InpFrom or 0.");
+      Print("MarketFusion calendar exporter: end time must be later than start time.");
       return;
      }
-
-   MqlCalendarValue values[];
-   ResetLastError();
-   int total=CalendarValueHistory(values,InpFrom,InpTo,InpCountryCode,InpCurrency);
-   if(total<0)
+   if(InpBatchDays<1 || InpBatchDays>90)
      {
-      PrintFormat("CalendarValueHistory failed. Error=%d",GetLastError());
-      return;
-     }
-   if(total==0)
-     {
-      Print("CalendarValueHistory returned no rows.");
+      Print("MarketFusion calendar exporter: InpBatchDays must be between 1 and 90.");
       return;
      }
 
@@ -81,52 +117,64 @@ void OnStart()
              "exported_at_server");
 
    datetime exported_at=TimeTradeServer();
+   datetime cursor=InpFrom;
    int written=0;
-   for(int i=0;i<total;i++)
+   int batches=0;
+   bool failed=false;
+
+   while(cursor<=effective_to)
      {
-      MqlCalendarEvent event;
-      MqlCalendarCountry country;
-      ZeroMemory(event);
-      ZeroMemory(country);
-      bool have_event=CalendarEventById(values[i].event_id,event);
-      bool have_country=false;
-      if(have_event)
-         have_country=CalendarCountryById(event.country_id,country);
+      datetime chunk_to=cursor + InpBatchDays*86400 - 1;
+      if(chunk_to>effective_to)
+         chunk_to=effective_to;
 
-      string event_name=have_event ? event.name : "";
-      string event_code=have_event ? event.event_code : "";
-      string country_code=have_country ? country.code : InpCountryCode;
-      string currency=have_country ? country.currency : InpCurrency;
-      string unit=have_event ? EnumToString(event.unit) : "";
-      string importance=have_event ? EnumToString(event.importance) : "";
-      string multiplier=have_event ? EnumToString(event.multiplier) : "";
-      string time_mode=have_event ? EnumToString(event.time_mode) : "";
-      string sector=have_event ? EnumToString(event.sector) : "";
-      string frequency=have_event ? EnumToString(event.frequency) : "";
-      string source_url=have_event ? event.source_url : "";
-      int digits=have_event ? (int)event.digits : 8;
-      if(digits<0) digits=0;
-      if(digits>8) digits=8;
+      MqlCalendarValue values[];
+      ArrayFree(values);
+      ResetLastError();
+      int total=CalendarValueHistory(values,cursor,chunk_to,InpCountryCode,InpCurrency);
+      if(total<0)
+        {
+         int error=GetLastError();
+         PrintFormat("CalendarValueHistory failed for %s -> %s. Error=%d",
+                     TimeField(cursor),TimeField(chunk_to),error);
+         failed=true;
+         break;
+        }
 
-      FileWrite(handle,
-                StringFormat("%I64u",values[i].id),
-                StringFormat("%I64u",values[i].event_id),
-                TimeField(values[i].time),
-                TimeField(values[i].period),
-                IntegerToString(values[i].revision),
-                NumericField(values[i],0,digits),
-                NumericField(values[i],1,digits),
-                NumericField(values[i],2,digits),
-                NumericField(values[i],3,digits),
-                EnumToString(values[i].impact_type),
-                event_name,event_code,country_code,currency,unit,importance,multiplier,
-                IntegerToString(digits),time_mode,sector,frequency,source_url,
-                TimeField(exported_at));
-      written++;
+      for(int i=0;i<total;i++)
+        {
+         if(!WriteCalendarRow(handle,values[i],exported_at))
+           {
+            PrintFormat("FileWrite failed after %d rows. Error=%d",written,GetLastError());
+            failed=true;
+            break;
+           }
+         written++;
+        }
+      if(failed)
+         break;
+
+      batches++;
+      if((batches%12)==0 || chunk_to>=effective_to)
+         PrintFormat("MarketFusion calendar export progress: batches=%d rows=%d through %s",
+                     batches,written,TimeField(chunk_to));
+
+      if(chunk_to>=effective_to)
+         break;
+      cursor=chunk_to+1;
      }
 
    FileFlush(handle);
    FileClose(handle);
-   PrintFormat("MarketFusion historical calendar export complete: %d rows -> MQL5/Files/%s",written,InpOutputFile);
+
+   if(failed)
+     {
+      FileDelete(InpOutputFile);
+      Print("MarketFusion historical calendar export FAILED; partial output deleted.");
+      return;
+     }
+
+   PrintFormat("MarketFusion historical calendar export complete: %d rows in %d batches -> MQL5/Files/%s",
+               written,batches,InpOutputFile);
    Print("Important: MT5 calendar times are trade-server time. Do not treat them as UTC without an independent event-day offset audit.");
   }
