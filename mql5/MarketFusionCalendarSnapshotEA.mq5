@@ -2,6 +2,7 @@
 
 input int InpSnapshotSeconds = 300;
 input int InpLookaheadHours = 336;
+input int InpLookbackHours = 6;
 input bool InpTargetsOnly = true;
 input string InpCountryCode = "US";
 input string InpCurrency = "USD";
@@ -83,11 +84,12 @@ void CaptureSnapshot()
   {
    datetime captured_server=TimeTradeServer();
    datetime captured_gmt=TimeGMT();
+   datetime from_time=captured_server-(InpLookbackHours*3600);
    datetime to_time=captured_server+(InpLookaheadHours*3600);
 
    MqlCalendarValue values[];
    ResetLastError();
-   int total=CalendarValueHistory(values,captured_server,to_time,InpCountryCode,InpCurrency);
+   int total=CalendarValueHistory(values,from_time,to_time,InpCountryCode,InpCurrency);
    if(total<0)
      {
       PrintFormat("MarketFusion snapshot CalendarValueHistory failed. Error=%d",GetLastError());
@@ -104,6 +106,7 @@ void CaptureSnapshot()
    int target_rows=0;
    int written=0;
    int forecast_rows=0;
+   int actual_rows=0;
    for(int i=0;i<total;i++)
      {
       bool is_target=IsTargetEventId(values[i].event_id);
@@ -138,6 +141,8 @@ void CaptureSnapshot()
 
       if(values[i].HasForecastValue())
          forecast_rows++;
+      if(values[i].HasActualValue())
+         actual_rows++;
 
       FileWrite(handle,
                 StringFormat("%I64u",values[i].id),
@@ -158,17 +163,17 @@ void CaptureSnapshot()
 
    FileFlush(handle);
    FileClose(handle);
-   PrintFormat("MarketFusion target snapshot: queried=%d target=%d written=%d forecasts=%d lookahead=%dh captured=%s GMT",
-               total,target_rows,written,forecast_rows,InpLookaheadHours,UtcIso(captured_gmt));
+   PrintFormat("MarketFusion target snapshot: queried=%d target=%d written=%d forecasts=%d actuals=%d lookback=%dh lookahead=%dh captured=%s GMT",
+               total,target_rows,written,forecast_rows,actual_rows,InpLookbackHours,InpLookaheadHours,UtcIso(captured_gmt));
   }
 
 int OnInit()
   {
-   if(InpSnapshotSeconds<60 || InpLookaheadHours<1)
+   if(InpSnapshotSeconds<60 || InpLookaheadHours<1 || InpLookbackHours<0 || InpLookbackHours>48)
       return INIT_PARAMETERS_INCORRECT;
    EventSetTimer(InpSnapshotSeconds);
    CaptureSnapshot();
-   Print("MarketFusionCalendarSnapshotEA started. Read-only target calendar collector; it does not trade.");
+   Print("MarketFusionCalendarSnapshotEA started. Read-only target calendar collector with post-release lookback; it does not trade.");
    return INIT_SUCCEEDED;
   }
 
