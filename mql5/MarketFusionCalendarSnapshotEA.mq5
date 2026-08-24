@@ -5,7 +5,7 @@ input int InpLookaheadHours = 336;
 input bool InpTargetsOnly = true;
 input string InpCountryCode = "US";
 input string InpCurrency = "USD";
-input string InpOutputFile = "marketfusion_mt5_calendar_snapshots.tsv";
+input string InpOutputFile = "marketfusion_mt5_target_snapshots.tsv";
 
 bool IsTargetEventId(const ulong event_id)
   {
