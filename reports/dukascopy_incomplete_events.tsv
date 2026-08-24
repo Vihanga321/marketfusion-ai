@@ -1,0 +1,112 @@
+event_id	event_type	event_timestamp_utc	batch_id	missing_source	missing_window_from_utc	missing_window_to_utc	reason	retry_count	provider_error
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	native_bid_m1	2015-01-16T13:20:00Z	2015-01-16T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	native_bid_m1	2015-01-16T14:00:00Z	2015-01-16T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	native_bid_m1	2015-01-16T15:00:00Z	2015-01-16T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	native_bid_m1	2015-01-16T16:00:00Z	2015-01-16T16:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	native_bid_m1	2015-01-16T17:00:00Z	2015-01-16T17:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20150116T1330Z	us_cpi_release	2015-01-16T13:30:00Z	batch_001	tick_history	2015-01-16T17:00:00Z	2015-01-16T17:40:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20150807T1230Z	us_employment_situation	2015-08-07T12:30:00Z	batch_002	tick_history	2015-08-07T15:00:00Z	2015-08-07T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20150807T1230Z	us_employment_situation	2015-08-07T12:30:00Z	batch_002	tick_history	2015-08-07T16:00:00Z	2015-08-07T16:40:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20150819T1230Z	us_cpi_release	2015-08-19T12:30:00Z	batch_002	tick_history	2015-08-19T12:20:00Z	2015-08-19T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20150819T1230Z	us_cpi_release	2015-08-19T12:30:00Z	batch_002	tick_history	2015-08-19T13:00:00Z	2015-08-19T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20150819T1230Z	us_cpi_release	2015-08-19T12:30:00Z	batch_002	tick_history	2015-08-19T14:00:00Z	2015-08-19T14:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20160108T1330Z	us_employment_situation	2016-01-08T13:30:00Z	batch_002	tick_history	2016-01-08T15:00:00Z	2016-01-08T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20160108T1330Z	us_employment_situation	2016-01-08T13:30:00Z	batch_002	tick_history	2016-01-08T16:00:00Z	2016-01-08T16:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20160205T1330Z	us_employment_situation	2016-02-05T13:30:00Z	batch_003	tick_history	2016-02-05T14:00:00Z	2016-02-05T14:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20160219T1330Z	us_cpi_release	2016-02-19T13:30:00Z	batch_003	tick_history	2016-02-19T14:00:00Z	2016-02-19T14:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20160219T1330Z	us_cpi_release	2016-02-19T13:30:00Z	batch_003	tick_history	2016-02-19T15:00:00Z	2016-02-19T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20160219T1330Z	us_cpi_release	2016-02-19T13:30:00Z	batch_003	tick_history	2016-02-19T16:00:00Z	2016-02-19T16:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20160304T1330Z	us_employment_situation	2016-03-04T13:30:00Z	batch_003	tick_history	2016-03-04T17:00:00Z	2016-03-04T17:40:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	native_bid_m1	2016-07-15T12:20:00Z	2016-07-15T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	native_bid_m1	2016-07-15T13:00:00Z	2016-07-15T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	native_bid_m1	2016-07-15T14:00:00Z	2016-07-15T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	native_bid_m1	2016-07-15T15:00:00Z	2016-07-15T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	native_bid_m1	2016-07-15T16:00:00Z	2016-07-15T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	tick_history	2016-07-15T12:20:00Z	2016-07-15T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20160715T1230Z	us_cpi_release	2016-07-15T12:30:00Z	batch_004	tick_history	2016-07-15T13:00:00Z	2016-07-15T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20160805T1230Z	us_employment_situation	2016-08-05T12:30:00Z	batch_004	native_bid_m1	2016-08-05T12:20:00Z	2016-08-05T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20160805T1230Z	us_employment_situation	2016-08-05T12:30:00Z	batch_004	native_bid_m1	2016-08-05T13:00:00Z	2016-08-05T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20160805T1230Z	us_employment_situation	2016-08-05T12:30:00Z	batch_004	native_bid_m1	2016-08-05T14:00:00Z	2016-08-05T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20160805T1230Z	us_employment_situation	2016-08-05T12:30:00Z	batch_004	native_bid_m1	2016-08-05T15:00:00Z	2016-08-05T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20160805T1230Z	us_employment_situation	2016-08-05T12:30:00Z	batch_004	native_bid_m1	2016-08-05T16:00:00Z	2016-08-05T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20170106T1330Z	us_employment_situation	2017-01-06T13:30:00Z	batch_004	tick_history	2017-01-06T13:20:00Z	2017-01-06T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	native_bid_m1	2017-07-14T12:20:00Z	2017-07-14T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	native_bid_m1	2017-07-14T13:00:00Z	2017-07-14T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	native_bid_m1	2017-07-14T14:00:00Z	2017-07-14T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	native_bid_m1	2017-07-14T15:00:00Z	2017-07-14T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	native_bid_m1	2017-07-14T16:00:00Z	2017-07-14T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20170714T1230Z	us_cpi_release	2017-07-14T12:30:00Z	batch_006	tick_history	2017-07-14T12:20:00Z	2017-07-14T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20180202T1330Z	us_employment_situation	2018-02-02T13:30:00Z	batch_007	tick_history	2018-02-02T14:00:00Z	2018-02-02T14:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20180202T1330Z	us_employment_situation	2018-02-02T13:30:00Z	batch_007	tick_history	2018-02-02T15:00:00Z	2018-02-02T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20180202T1330Z	us_employment_situation	2018-02-02T13:30:00Z	batch_007	tick_history	2018-02-02T17:00:00Z	2018-02-02T17:40:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20180214T1330Z	us_cpi_release	2018-02-14T13:30:00Z	batch_007	native_bid_m1	2018-02-14T13:20:00Z	2018-02-14T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180214T1330Z	us_cpi_release	2018-02-14T13:30:00Z	batch_007	native_bid_m1	2018-02-14T14:00:00Z	2018-02-14T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180214T1330Z	us_cpi_release	2018-02-14T13:30:00Z	batch_007	native_bid_m1	2018-02-14T15:00:00Z	2018-02-14T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180214T1330Z	us_cpi_release	2018-02-14T13:30:00Z	batch_007	native_bid_m1	2018-02-14T16:00:00Z	2018-02-14T16:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180214T1330Z	us_cpi_release	2018-02-14T13:30:00Z	batch_007	native_bid_m1	2018-02-14T17:00:00Z	2018-02-14T17:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	native_bid_m1	2018-03-13T12:20:00Z	2018-03-13T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	native_bid_m1	2018-03-13T13:00:00Z	2018-03-13T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	native_bid_m1	2018-03-13T14:00:00Z	2018-03-13T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	native_bid_m1	2018-03-13T15:00:00Z	2018-03-13T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	native_bid_m1	2018-03-13T16:00:00Z	2018-03-13T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180313T1230Z	us_cpi_release	2018-03-13T12:30:00Z	batch_007	tick_history	2018-03-13T12:20:00Z	2018-03-13T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20180411T1230Z	us_cpi_release	2018-04-11T12:30:00Z	batch_007	tick_history	2018-04-11T13:00:00Z	2018-04-11T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	native_bid_m1	2018-07-12T12:20:00Z	2018-07-12T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	native_bid_m1	2018-07-12T13:00:00Z	2018-07-12T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	native_bid_m1	2018-07-12T14:00:00Z	2018-07-12T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	native_bid_m1	2018-07-12T15:00:00Z	2018-07-12T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	native_bid_m1	2018-07-12T16:00:00Z	2018-07-12T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	tick_history	2018-07-12T12:20:00Z	2018-07-12T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20180712T1230Z	us_cpi_release	2018-07-12T12:30:00Z	batch_008	tick_history	2018-07-12T13:00:00Z	2018-07-12T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20200213T1330Z	us_cpi_release	2020-02-13T13:30:00Z	batch_011	tick_history	2020-02-13T15:00:00Z	2020-02-13T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	native_bid_m1	2020-07-14T12:20:00Z	2020-07-14T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	native_bid_m1	2020-07-14T13:00:00Z	2020-07-14T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	native_bid_m1	2020-07-14T14:00:00Z	2020-07-14T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	native_bid_m1	2020-07-14T15:00:00Z	2020-07-14T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	native_bid_m1	2020-07-14T16:00:00Z	2020-07-14T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20200714T1230Z	us_cpi_release	2020-07-14T12:30:00Z	batch_012	tick_history	2020-07-14T12:20:00Z	2020-07-14T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20210713T1230Z	us_cpi_release	2021-07-13T12:30:00Z	batch_014	native_bid_m1	2021-07-13T12:20:00Z	2021-07-13T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20210713T1230Z	us_cpi_release	2021-07-13T12:30:00Z	batch_014	native_bid_m1	2021-07-13T13:00:00Z	2021-07-13T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20210713T1230Z	us_cpi_release	2021-07-13T12:30:00Z	batch_014	native_bid_m1	2021-07-13T14:00:00Z	2021-07-13T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20210713T1230Z	us_cpi_release	2021-07-13T12:30:00Z	batch_014	native_bid_m1	2021-07-13T15:00:00Z	2021-07-13T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20210713T1230Z	us_cpi_release	2021-07-13T12:30:00Z	batch_014	native_bid_m1	2021-07-13T16:00:00Z	2021-07-13T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	native_bid_m1	2022-07-13T12:20:00Z	2022-07-13T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	native_bid_m1	2022-07-13T13:00:00Z	2022-07-13T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	native_bid_m1	2022-07-13T14:00:00Z	2022-07-13T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	native_bid_m1	2022-07-13T15:00:00Z	2022-07-13T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	native_bid_m1	2022-07-13T16:00:00Z	2022-07-13T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20220713T1230Z	us_cpi_release	2022-07-13T12:30:00Z	batch_016	tick_history	2022-07-13T12:20:00Z	2022-07-13T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	native_bid_m1	2023-07-12T12:20:00Z	2023-07-12T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	native_bid_m1	2023-07-12T13:00:00Z	2023-07-12T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	native_bid_m1	2023-07-12T14:00:00Z	2023-07-12T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	native_bid_m1	2023-07-12T15:00:00Z	2023-07-12T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	native_bid_m1	2023-07-12T16:00:00Z	2023-07-12T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	tick_history	2023-07-12T12:20:00Z	2023-07-12T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	tick_history	2023-07-12T13:00:00Z	2023-07-12T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20230712T1230Z	us_cpi_release	2023-07-12T12:30:00Z	batch_018	tick_history	2023-07-12T14:00:00Z	2023-07-12T14:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20240111T1330Z	us_cpi_release	2024-01-11T13:30:00Z	batch_019	tick_history	2024-01-11T15:00:00Z	2024-01-11T15:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20240111T1330Z	us_cpi_release	2024-01-11T13:30:00Z	batch_019	tick_history	2024-01-11T16:00:00Z	2024-01-11T16:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	native_bid_m1	2024-07-11T12:20:00Z	2024-07-11T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	native_bid_m1	2024-07-11T13:00:00Z	2024-07-11T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	native_bid_m1	2024-07-11T14:00:00Z	2024-07-11T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	native_bid_m1	2024-07-11T15:00:00Z	2024-07-11T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	native_bid_m1	2024-07-11T16:00:00Z	2024-07-11T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	tick_history	2024-07-11T12:20:00Z	2024-07-11T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20240711T1230Z	us_cpi_release	2024-07-11T12:30:00Z	batch_020	tick_history	2024-07-11T13:00:00Z	2024-07-11T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20250715T1230Z	us_cpi_release	2025-07-15T12:30:00Z	batch_022	native_bid_m1	2025-07-15T12:20:00Z	2025-07-15T12:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20250715T1230Z	us_cpi_release	2025-07-15T12:30:00Z	batch_022	native_bid_m1	2025-07-15T13:00:00Z	2025-07-15T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20250715T1230Z	us_cpi_release	2025-07-15T12:30:00Z	batch_022	native_bid_m1	2025-07-15T14:00:00Z	2025-07-15T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20250715T1230Z	us_cpi_release	2025-07-15T12:30:00Z	batch_022	native_bid_m1	2025-07-15T15:00:00Z	2025-07-15T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_cpi_release:20250715T1230Z	us_cpi_release	2025-07-15T12:30:00Z	batch_022	native_bid_m1	2025-07-15T16:00:00Z	2025-07-15T16:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	native_bid_m1	2026-03-06T13:20:00Z	2026-03-06T13:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	native_bid_m1	2026-03-06T14:00:00Z	2026-03-06T14:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	native_bid_m1	2026-03-06T15:00:00Z	2026-03-06T15:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	native_bid_m1	2026-03-06T16:00:00Z	2026-03-06T16:59:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	native_bid_m1	2026-03-06T17:00:00Z	2026-03-06T17:40:00Z	HISTORY_EMPTY	3	no native BID bars returned
+bls:us_employment_situation:20260306T1330Z	us_employment_situation	2026-03-06T13:30:00Z	batch_023	tick_history	2026-03-06T13:20:00Z	2026-03-06T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20260508T1230Z	us_employment_situation	2026-05-08T12:30:00Z	batch_023	tick_history	2026-05-08T12:20:00Z	2026-05-08T12:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_employment_situation:20260508T1230Z	us_employment_situation	2026-05-08T12:30:00Z	batch_023	tick_history	2026-05-08T13:00:00Z	2026-05-08T13:59:59.999Z	HISTORY_EMPTY	3	no ticks returned
+bls:us_cpi_release:20200410T1230Z	us_cpi_release	2020-04-10T12:30:00Z	batch_011	tick_history			TICK_HISTORY_INCOMPLETE	0	provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+bls:us_employment_situation:20210402T1230Z	us_employment_situation	2021-04-02T12:30:00Z	batch_013	tick_history			TICK_HISTORY_INCOMPLETE	0	provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+bls:us_employment_situation:20210806T1230Z	us_employment_situation	2021-08-06T12:30:00Z	batch_014	tick_history			TICK_HISTORY_INCOMPLETE	0	provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+bls:us_employment_situation:20230407T1230Z	us_employment_situation	2023-04-07T12:30:00Z	batch_017	tick_history			TICK_HISTORY_INCOMPLETE	0	provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0

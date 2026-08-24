@@ -1,0 +1,5 @@
+measure_id,rows,exact_matches,precision_matches,display_decimals,max_abs_raw_difference,compatibility_status,cross_source_historical_surprise_eligible,historical_mt5_forecast_pit_verified,note
+headline_cpi_yoy_sa,118,0,83,1,0.1355320241253844,COMPATIBILITY_REVIEW_REQUIRED,False,False,V0.4C is a PIT SA YoY transformation; MT5 is a one-decimal calendar CPI y/y field.
+core_cpi_yoy_sa,118,0,103,1,0.0770579363889774,COMPATIBILITY_REVIEW_REQUIRED,False,False,V0.4C is a PIT SA YoY transformation; MT5 is a one-decimal calendar Core CPI y/y field.
+unemployment_rate,124,124,124,1,0.0,EXACT_COMPATIBLE,False,False,U-3 unemployment rate identity; exact cross-source comparison expected.
+nonfarm_payroll_change,124,121,121,0,77.0,PARTIAL_EXACT_WITH_QUARANTINED_MISMATCHES,False,False,"Total Nonfarm Payrolls, thousands of jobs; mismatches are quarantined rather than repaired."

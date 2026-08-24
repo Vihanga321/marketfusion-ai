@@ -1,0 +1,3 @@
+event_id,rows,event_codes,event_names,rejection_reason,model_eligible
+840030024,139,u6-unemployment-rate,U6 Unemployment Rate,U6 unemployment rate is not U-3 unemployment rate,False
+840030023,139,private-nonfarm-payrolls,Private Nonfarm Payrolls,Private Nonfarm Payrolls is not Total Nonfarm Payrolls,False

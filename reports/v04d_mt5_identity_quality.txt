@@ -1,0 +1,20 @@
+MARKETFUSION V0.4D MT5 EVENT IDENTITY AUDIT
+target_event_ids: 4
+target_rows: 556
+target_forecast_rows: 442
+stable_exact_identity_candidates: 4/4
+rejected_variant_ids: 2
+rejected_variant_rows: 278
+historical_point_in_time_verified_rows: 0
+historical_model_eligible_consensus_rows: 0
+server_time_to_utc_status: UNVERIFIED
+v04c_actual_comparison_rows: 484
+v04c_actual_exact_match_rows_1e-9: 245
+v04c_actual_max_abs_difference: 77
+actual_compare_core_cpi_yoy_sa: rows=118 exact=0 max_abs_diff=0.077057936389
+actual_compare_headline_cpi_yoy_sa: rows=118 exact=0 max_abs_diff=0.135532024125
+actual_compare_nonfarm_payroll_change: rows=124 exact=121 max_abs_diff=77
+actual_compare_unemployment_rate: rows=124 exact=124 max_abs_diff=0
+identity_policy: exact event ID/code/name is necessary but not sufficient for model eligibility
+pit_policy: historical MT5 forecast rows remain research-only without a proven pre-release snapshot time
+V04D_MT5_IDENTITY_STATUS: PASS_FAIL_CLOSED

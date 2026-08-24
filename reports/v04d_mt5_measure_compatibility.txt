@@ -1,0 +1,14 @@
+MARKETFUSION V0.4D MT5 MEASURE COMPATIBILITY AUDIT
+measures: 4
+comparison_rows: 484
+exact_matches: 245
+precision_matches: 431
+quarantined_precision_mismatches: 53
+headline_cpi_yoy_sa: rows=118 exact=0 precision_match=83 status=COMPATIBILITY_REVIEW_REQUIRED
+core_cpi_yoy_sa: rows=118 exact=0 precision_match=103 status=COMPATIBILITY_REVIEW_REQUIRED
+unemployment_rate: rows=124 exact=124 precision_match=124 status=EXACT_COMPATIBLE
+nonfarm_payroll_change: rows=124 exact=121 precision_match=121 status=PARTIAL_EXACT_WITH_QUARANTINED_MISMATCHES
+historical_consensus_policy: MT5 historical forecast values remain NON-MODEL-ELIGIBLE without proven pre-release snapshot timing
+cross_source_policy: do not subtract an MT5 forecast from a differently-defined V0.4C actual merely because values are numerically close
+future_policy: once a live MT5 forecast snapshot is causally verified, prefer provider-consistent MT5 forecast + MT5 actual for raw surprise, while retaining official-source actuals for independent validation
+V04D_MT5_COMPATIBILITY_STATUS: PASS_FAIL_CLOSED

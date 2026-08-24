@@ -1,0 +1,10 @@
+MARKETFUSION V0.4D LIVE MT5 SURPRISE ENGINE
+snapshot_rows: 60
+verified_post_release_actual_rows: 0
+verified_live_surprise_rows: 0
+consensus_rule: latest causally verified pre-release forecast from canonical consensus gate
+actual_rule: earliest causally verified post-release MT5 actual for the exact same release
+revision_policy: later actual revisions never overwrite the first observed release actual
+normalization_policy: raw surprises only; no z-score/bucket activation until sufficient audited sample
+trading_policy: research/data infrastructure only; no order execution
+V04D_LIVE_MT5_SURPRISE_STATUS: PASS_FAIL_CLOSED

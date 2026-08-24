@@ -1,0 +1,49 @@
+MARKETFUSION DUKASCOPY TARGETED MISMATCH DIAGNOSTIC
+Scope: exactly four approved production MISMATCH events; no other event was requested
+Mode: read-only historical BID M1 and tick retrieval; no trading API
+PRICE_TOLERANCE: 1.0e-8 (unchanged)
+Production validation outcome: NOT MODIFIED
+
+EVENT: bls:us_employment_situation:20220902T1230Z
+event_timestamp_utc: 2022-09-02T12:30:00Z
+native_bid_minutes: 261/261
+historical_ticks: 63846
+empty_native_chunks_after_retries: 0
+empty_tick_chunks_after_retries: 0
+affected_minutes: 1
+- 2022-09-02T15:59:00Z | OHLC_MISMATCH | PROVIDER_NATIVE_TICK_DISAGREEMENT | max_diff=0.0000200000 | complete valid tick replay is internally consistent but does not reproduce native BID M1
+
+EVENT: bls:us_cpi_release:20230913T1230Z
+event_timestamp_utc: 2023-09-13T12:30:00Z
+native_bid_minutes: 261/261
+historical_ticks: 42328
+empty_native_chunks_after_retries: 0
+empty_tick_chunks_after_retries: 0
+affected_minutes: 4
+- 2023-09-13T14:56:00Z | OHLC_MISMATCH | PROVIDER_NATIVE_TICK_DISAGREEMENT | max_diff=0.0001300000 | complete valid tick replay is internally consistent but does not reproduce native BID M1
+- 2023-09-13T14:57:00Z | REBUILT_BID_MISSING | TICK_HISTORY_HOLE | max_diff= | native BID M1 exists but provider tick history returned zero ticks in the minute
+- 2023-09-13T14:58:00Z | REBUILT_BID_MISSING | TICK_HISTORY_HOLE | max_diff= | native BID M1 exists but provider tick history returned zero ticks in the minute
+- 2023-09-13T14:59:00Z | REBUILT_BID_MISSING | TICK_HISTORY_HOLE | max_diff= | native BID M1 exists but provider tick history returned zero ticks in the minute
+
+EVENT: bls:us_employment_situation:20250404T1230Z
+event_timestamp_utc: 2025-04-04T12:30:00Z
+native_bid_minutes: 261/261
+historical_ticks: 93094
+empty_native_chunks_after_retries: 0
+empty_tick_chunks_after_retries: 0
+affected_minutes: 3
+- 2025-04-04T15:57:00Z | OHLC_MISMATCH | PROVIDER_NATIVE_TICK_DISAGREEMENT | max_diff=0.0002000000 | complete valid tick replay is internally consistent but does not reproduce native BID M1
+- 2025-04-04T15:58:00Z | REBUILT_BID_MISSING | TICK_HISTORY_HOLE | max_diff= | native BID M1 exists but provider tick history returned zero ticks in the minute
+- 2025-04-04T15:59:00Z | REBUILT_BID_MISSING | TICK_HISTORY_HOLE | max_diff= | native BID M1 exists but provider tick history returned zero ticks in the minute
+
+EVENT: bls:us_cpi_release:20260512T1230Z
+event_timestamp_utc: 2026-05-12T12:30:00Z
+native_bid_minutes: 261/261
+historical_ticks: 21258
+empty_native_chunks_after_retries: 0
+empty_tick_chunks_after_retries: 0
+affected_minutes: 2
+- 2026-05-12T12:53:00Z | OHLC_MISMATCH | PROVIDER_NATIVE_TICK_DISAGREEMENT | max_diff=0.0000500000 | complete valid tick replay is internally consistent but does not reproduce native BID M1
+- 2026-05-12T12:54:00Z | OHLC_MISMATCH | PROVIDER_NATIVE_TICK_DISAGREEMENT | max_diff=0.0000400000 | complete valid tick replay is internally consistent but does not reproduce native BID M1
+
+DIAGNOSTIC_STATUS: COMPLETE

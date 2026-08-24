@@ -1,0 +1,63 @@
+MARKETFUSION AI - DUKASCOPY FULL EVENT VALIDATION
+========================================================================
+Expected events: 276
+Validated events: 276
+Batch summaries: 23
+PASS: 242
+INCOMPLETE: 30
+MISMATCH: 4
+ERROR: 0
+FULL_VALIDATION_STATUS: FAIL
+
+BY EVENT TYPE
+status                   PASS  INCOMPLETE  MISMATCH  ERROR
+event_type                                                
+us_cpi_release            118          18         2      0
+us_employment_situation   124          12         2      0
+
+INTERPRETATION
+- PASS means complete minute coverage and exact native-BID OHLC agreement within tolerance.
+- INCOMPLETE means provider data were unavailable; missing minutes are never interpolated or fabricated.
+- MISMATCH means retrieved tick reconstruction disagreed with native BID or contained invalid spreads.
+- ERROR means the validator itself could not complete that event.
+- model_eligible_market_reaction is true only for strict PASS rows.
+
+INCOMPLETE EVENTS
+                                  event_id              event_type  missing_minutes  missing_chunks                                                                                                                                                                                                                    error
+         bls:us_cpi_release:20150116T1330Z          us_cpi_release              261               6                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20150807T1230Z us_employment_situation              101               2                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=2
+         bls:us_cpi_release:20150819T1230Z          us_cpi_release              160               3                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=3
+bls:us_employment_situation:20160108T1330Z us_employment_situation              120               2                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=2
+bls:us_employment_situation:20160205T1330Z us_employment_situation               60               1                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=1
+         bls:us_cpi_release:20160219T1330Z          us_cpi_release              180               3                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=3
+bls:us_employment_situation:20160304T1330Z us_employment_situation               41               1                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=1
+         bls:us_cpi_release:20160715T1230Z          us_cpi_release              261               7                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=2; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20160805T1230Z us_employment_situation              261               5                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=0; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20170106T1330Z us_employment_situation               40               1                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=1
+         bls:us_cpi_release:20170714T1230Z          us_cpi_release              261               6                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20180202T1330Z us_employment_situation              161               3                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=3
+         bls:us_cpi_release:20180214T1330Z          us_cpi_release              261               5                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=0; native=whole-window native BID returned 0/261 bars
+         bls:us_cpi_release:20180313T1230Z          us_cpi_release              261               6                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=whole-window native BID returned 0/261 bars
+         bls:us_cpi_release:20180411T1230Z          us_cpi_release               60               1                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=1
+         bls:us_cpi_release:20180712T1230Z          us_cpi_release              261               7                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=2; native=whole-window native BID returned 0/261 bars
+         bls:us_cpi_release:20200213T1330Z          us_cpi_release               60               1                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=1
+         bls:us_cpi_release:20200410T1230Z          us_cpi_release                1               0                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+         bls:us_cpi_release:20200714T1230Z          us_cpi_release              261               6                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20210402T1230Z us_employment_situation                1               0                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+         bls:us_cpi_release:20210713T1230Z          us_cpi_release              261               5                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=0; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20210806T1230Z us_employment_situation                1               0                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+         bls:us_cpi_release:20220713T1230Z          us_cpi_release              261               6 provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=com.dukascopy.charts.data.datacache.DataCacheException: Failed to load in-progress candle data in timeout period [EUR/USD, 1 Min, Bid]
+bls:us_employment_situation:20230407T1230Z us_employment_situation                1               0                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=0
+         bls:us_cpi_release:20230712T1230Z          us_cpi_release              261               8                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=3; native=whole-window native BID returned 0/261 bars
+         bls:us_cpi_release:20240111T1330Z          us_cpi_release              120               2                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=2
+         bls:us_cpi_release:20240711T1230Z          us_cpi_release              261               7                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=2; native=whole-window native BID returned 0/261 bars
+         bls:us_cpi_release:20250715T1230Z          us_cpi_release              261               5                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=0; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20260306T1330Z us_employment_situation              261               6                                                                                            provider retrieval incomplete; nativeMissingChunks=5; tickMissingChunks=1; native=whole-window native BID returned 0/261 bars
+bls:us_employment_situation:20260508T1230Z us_employment_situation              100               2                                                                                                                                                provider retrieval incomplete; nativeMissingChunks=0; tickMissingChunks=2
+
+INCOMPLETE CAUSES
+failure_reason
+TICK_HISTORY_INCOMPLETE               16
+NATIVE_AND_TICK_HISTORY_INCOMPLETE    10
+NATIVE_REFERENCE_UNAVAILABLE           4
+Detailed provider-gap rows: 111 (C:\Users\vihan\marketfusion-ai\reports\dukascopy_incomplete_events.tsv)
