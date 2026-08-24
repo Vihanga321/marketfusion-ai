@@ -31,3 +31,8 @@ models/v05c/
 jforex-event-exporter/target/
 .vscode/
 .idea/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/*.tsbuildinfo
+logs/v07/
+.vite/

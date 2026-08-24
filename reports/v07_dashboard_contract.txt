@@ -1,0 +1,31 @@
+MARKETFUSION V0.7 LOCAL DASHBOARD CONTRACT
+
+mode: LOCALHOST_READ_ONLY
+api_bind: 127.0.0.1:8765
+dashboard_url: http://127.0.0.1:5173
+cors_origins: http://127.0.0.1:5173, http://localhost:5173
+state_source: data/runtime/v06/latest_marketfusion_state.json
+market_source: data/mt5/continuous/EURUSD_{M1,M5,M15,H1}.parquet
+
+GET /api/health
+GET /api/state
+GET /api/market/candles?timeframe=M5&limit=300
+GET /api/market/summary
+GET /api/runtime/history?limit=100
+GET /api/events
+GET /api/intelligence
+GET /api/research
+GET /api/system/version
+
+candle_timeframes: M1,M5,M15,H1
+candle_limit_max: 1000
+runtime_history_limit_max: 1000
+trading_endpoints: 0
+account_data: FORBIDDEN
+order_and_position_data: FORBIDDEN
+credentials_and_secrets: FORBIDDEN
+trading_execution: DISABLED_NOT_IMPLEMENTED
+manual_execution: MT5_ONLY
+null_probability_policy: PRESERVE_NULL
+invalid_state_policy: SYSTEM_DATA_INVALID_WAIT
+stale_or_disconnected_policy: WAIT_VERY_LOW_AND_SUPPRESS_WINDOW

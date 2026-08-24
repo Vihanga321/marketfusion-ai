@@ -1,0 +1,46 @@
+MARKETFUSION V0.7 DASHBOARD VALIDATION
+
+commit: 636f0f0e7d918050296ae61ecabd27cffc923820
+tested_at_utc: 2026-08-24T13:43:07.513622+00:00
+
+Backend API:
+PASS
+
+Frontend build:
+PASS
+
+Frontend tests:
+PASS
+
+Live runtime:
+PASS
+
+Current advisory:
+WAIT
+
+Confidence:
+VERY_LOW
+
+MT5:
+CONNECTED
+
+V0.6:
+PASS_FAIL_CLOSED_NO_CHAMPION
+
+Provider health:
+FED_RSS: OK
+ECB: OK
+BLS: OK
+GDELT: DEGRADED
+FRED: DEGRADED
+
+Security:
+trading endpoints = 0
+account fields exposed = 0
+credential fields exposed = 0
+
+State contract:
+PASS
+
+FINAL STATUS:
+PASS_LOCAL_DASHBOARD_DEGRADED_PROVIDERS

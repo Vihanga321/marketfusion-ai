@@ -4,6 +4,25 @@ MarketFusion AI is an experimental EUR/USD research pipeline. V0.1 is retained a
 
 No result in this repository should be interpreted as a live-trading recommendation or a demonstrated predictive edge.
 
+## V0.7 local live dashboard
+
+The V0.7 React dashboard is a localhost-only, read-only view of the canonical V0.6C state. Trading execution is not implemented; any action remains manual in MT5.
+
+```powershell
+# START EVERYTHING
+.\scripts\start_marketfusion_full.ps1
+
+# DASHBOARD ONLY (and ensure V0.6 is running)
+.\scripts\start_marketfusion_dashboard.ps1
+
+# STOP only tracked MarketFusion processes
+.\scripts\stop_marketfusion.ps1
+```
+
+Open: `http://127.0.0.1:5173`
+
+The current fail-closed state is intentionally presented as WAIT / VERY LOW with no approved models and no trade window. See [the V0.7 dashboard contract](docs/V07_DASHBOARD.md) for endpoints, polling, and safety behavior.
+
 ## Versions
 
 - **V0.1:** Yahoo Finance daily baseline. Preserved because validation exposed a candle-data artifact and a misleading high apparent accuracy.

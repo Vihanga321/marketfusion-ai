@@ -1,0 +1,115 @@
+export type AdvisoryAction = "WAIT" | "BUY_BIAS" | "SELL_BIAS";
+export type Confidence = "VERY_LOW" | "LOW" | "MEDIUM" | "HIGH";
+export type ConnectionState = "CONNECTING" | "LIVE" | "STALE" | "DISCONNECTED";
+export type Timeframe = "M1" | "M5" | "M15" | "H1";
+
+export interface DualTime { utc: string | null; asia_colombo: string | null }
+export interface FreshnessState { status: string; observed_at_utc?: string | null; age_minutes?: number | null }
+export interface RegimeState {
+  volatility_regime?: string;
+  trend_regime?: string;
+  trend_score?: number | null;
+  current_volatility?: number | null;
+}
+export interface SpreadState { status?: string; current_points?: number | null; recent_median_points?: number | null; ratio?: number | null }
+export interface MarketState {
+  close?: number | null;
+  freshness?: FreshnessState;
+  session?: string;
+  regime?: RegimeState;
+  spread?: SpreadState;
+}
+export interface HorizonPrediction {
+  model_id?: string | null;
+  model_status: string;
+  model_created_at_utc?: string;
+  calibration_status?: string;
+  prob_down?: number | null;
+  prob_neutral?: number | null;
+  prob_up?: number | null;
+  top_class?: string;
+  top_probability?: number;
+  shadow_direction?: string;
+  decision_gate?: string;
+}
+export interface FusionProbability { down: number; neutral: number; up: number }
+export interface FusionState {
+  status?: string;
+  direction?: string;
+  confidence?: Confidence;
+  probabilities?: FusionProbability | null;
+  valid_horizons?: number[];
+  margin?: number;
+  horizon_directions?: Record<string, string>;
+}
+export interface PredictionState {
+  v06a_status?: string;
+  horizons: Record<string, HorizonPrediction>;
+  fusion?: FusionState | null;
+}
+export interface DecisionState {
+  action: AdvisoryAction;
+  action_meaning?: string;
+  direction?: string;
+  confidence: Confidence;
+  confidence_meaning?: string;
+  gate: string;
+  manual_confirmation_required: boolean;
+  trading_enabled: false;
+  decision_time: DualTime;
+  next_reassessment: DualTime;
+}
+export interface TradeWindowState { status: string; start_utc: string | null; end_utc: string | null; horizon_minutes?: number | null }
+export interface AuditedEvent { event_id?: string | null; event_code?: string; event_name?: string; event_timestamp_utc?: string }
+export interface EventRiskState {
+  status?: string;
+  data_status?: string;
+  blocks_direction?: boolean;
+  minutes_to_event?: number | null;
+  nearest_event?: AuditedEvent | null;
+  freshness?: FreshnessState;
+}
+export interface IntelligenceState {
+  status?: string;
+  news_15m?: number | null;
+  news_60m?: number | null;
+  news_240m?: number | null;
+  high_impact_240m?: number | null;
+  provider_errors?: number;
+}
+export interface HealthState { sources: Record<string, string>; failed_sources: string[]; degraded_sources: string[] }
+export interface Reason { code: string; priority: number; blocking: boolean; source: string; message: string; evidence?: unknown }
+export interface SystemState {
+  status: string;
+  mode: string;
+  symbol: string;
+  generated_time: DualTime;
+  registry?: { status?: string; champion_count?: number; reloaded_this_cycle?: boolean };
+}
+export interface MarketFusionState {
+  contract_version: string;
+  system: SystemState;
+  market: MarketState;
+  predictions: PredictionState;
+  decision: DecisionState;
+  trade_window: TradeWindowState;
+  event?: EventRiskState;
+  intelligence?: IntelligenceState;
+  health: HealthState;
+  reasons: Reason[];
+}
+export interface Candle { time: string; open: number; high: number; low: number; close: number; volume: number | null }
+export interface CandleResponse { status: string; timeframe: Timeframe; count: number; candles: Candle[] }
+export interface MarketSummary { status: string; captured_at_utc: string | null; bid: number | null; ask: number | null; mid: number | null; spread_points: number | null }
+export interface IntelligenceDetail {
+  status: string;
+  captured_at_utc: string | null;
+  news_counts: Record<string, number | null>;
+  topic_counts_24h: Record<string, number | null>;
+  macro: Record<string, number | null>;
+  provider_health: Record<string, string>;
+}
+export interface AuditedEventDetail { event_id: string | number | null; event_name: string | null; event_code: string | null; event_timestamp_utc: string | null; forecast_value: number | null; consensus_status: string | null }
+export interface EventsResponse { status: string; events: AuditedEventDetail[] }
+export interface ResearchCandidate { family: string; balanced_accuracy: number; promotion_status: string }
+export interface ResearchState { status: string; approved_champions: number; candidates: Record<string, ResearchCandidate>; last_training_utc: string | null; market_core_rows: number | null; history_days: number | null; v05b_eligibility: string; live_surprise_samples: number; next_recommended_training: string }

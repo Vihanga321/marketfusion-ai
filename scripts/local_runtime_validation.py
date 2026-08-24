@@ -543,7 +543,7 @@ def full_audit(args: argparse.Namespace) -> int:
     v05c, failures_c = _v05c_audit()
     v06, failures_6 = _v06_audit()
     mt5 = _mt5_report_values()
-    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle") if getattr(args, name) != "PASS"]
+    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle") if getattr(args, name) != "PASS"]
     if args.v04d == "FAIL":
         stage_failures.append("v04d")
     blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c + failures_6
@@ -551,12 +551,7 @@ def full_audit(args: argparse.Namespace) -> int:
     final = "FAIL" if blockers else ("PASS_FAIL_CLOSED_NO_CHAMPION" if int(v06["champion_count"]) == 0 else "PASS_DEGRADED" if degraded else "PASS")
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     tested_at = pd.Timestamp.now(tz="UTC").isoformat()
-    next_step = (
-        "Build the V0.7 read-only dashboard over the stable V0.6C state contract; keep execution and account access disabled."
-        if int(v06["champion_count"]) == 0 else
-        "Keep the read-only collectors running and rerun validation after degraded providers recover."
-        if degraded else "Keep the read-only collectors running and continue shadow evaluation."
-    )
+    next_step = "V0.8 Shadow-performance monitoring / model improvement."
     lines = [
         "MARKETFUSION FULL LOCAL RUNTIME VALIDATION", "", f"repository_commit: {commit}", f"tested_at_utc: {tested_at}", "",
         "SECURITY:", f"repo_safety: {args.repo_safety}", "credentials_exposed_by_output: NO", "trading_execution_present: NO", "",
@@ -629,7 +624,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("mt5")
     sub.add_parser("providers")
     audit = sub.add_parser("audit")
-    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle"):
+    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle"):
         audit.add_argument(f"--{name.replace('_', '-')}", choices=("PASS", "FAIL"), required=True)
     audit.add_argument("--v04d", choices=("PASS", "FAIL", "SKIPPED"), required=True)
     return result
