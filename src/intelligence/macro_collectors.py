@@ -11,6 +11,8 @@ import io
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .v05b_contract import MACRO_SOURCES
 
@@ -19,6 +21,23 @@ USER_AGENT = "MarketFusionAI/0.5B research collector"
 
 def utc_now() -> pd.Timestamp:
     return pd.Timestamp.now(tz="UTC")
+
+
+def _session() -> requests.Session:
+    retry = Retry(
+        total=2,
+        connect=2,
+        read=2,
+        status=2,
+        backoff_factor=0.8,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset({"GET"}),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    session = requests.Session()
+    session.mount("https://", HTTPAdapter(max_retries=retry, pool_connections=2, pool_maxsize=2))
+    return session
 
 
 def parse_fred_graph_csv(text: str, series_name: str, captured_at: pd.Timestamp) -> pd.DataFrame:
@@ -50,11 +69,17 @@ def parse_fred_graph_csv(text: str, series_name: str, captured_at: pd.Timestamp)
 def fetch_fred_graph(series_name: str, captured_at: pd.Timestamp, session: requests.Session) -> pd.DataFrame:
     spec = MACRO_SOURCES[series_name]
     start = (captured_at - pd.Timedelta(days=45)).date().isoformat()
+    end = captured_at.date().isoformat()
     response = session.get(
         spec["url"],
-        params={"cosd": start},
-        timeout=30,
-        headers={"User-Agent": USER_AGENT},
+        params={"cosd": start, "coed": end},
+        timeout=(10, 20),
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "text/csv, text/plain;q=0.9, */*;q=0.2",
+            # FRED occasionally resets long-lived keep-alive sockets on Windows.
+            "Connection": "close",
+        },
     )
     response.raise_for_status()
     return parse_fred_graph_csv(response.text, series_name, captured_at)
@@ -93,8 +118,8 @@ def fetch_ecb(series_name: str, captured_at: pd.Timestamp, session: requests.Ses
     response = session.get(
         spec["url"],
         params={"startPeriod": start, "format": "csvdata", "includeHistory": "true"},
-        timeout=45,
-        headers={"User-Agent": USER_AGENT},
+        timeout=(10, 30),
+        headers={"User-Agent": USER_AGENT, "Accept": "text/csv, */*;q=0.2"},
     )
     response.raise_for_status()
     return parse_ecb_csv(response.text, series_name, captured_at)
@@ -105,15 +130,23 @@ def collect_macro(captured_at: pd.Timestamp | None = None) -> tuple[pd.DataFrame
     frames: list[pd.DataFrame] = []
     errors: list[str] = []
     counts: dict[str, int] = {}
-    with requests.Session() as session:
-        for series_name, spec in MACRO_SOURCES.items():
-            try:
-                frame = fetch_ecb(series_name, capture, session) if spec["provider"] == "ECB_SDMX" else fetch_fred_graph(series_name, capture, session)
-                counts[series_name] = len(frame)
-                frames.append(frame)
-            except Exception as exc:
-                counts[series_name] = 0
-                errors.append(f"{series_name}: {type(exc).__name__}: {exc}")
+
+    # Use a fresh short-lived session for each provider row. This costs almost
+    # nothing at a five-minute cadence and avoids a reset socket poisoning the
+    # remaining FRED requests on Windows.
+    for series_name, spec in MACRO_SOURCES.items():
+        try:
+            with _session() as session:
+                frame = (
+                    fetch_ecb(series_name, capture, session)
+                    if spec["provider"] == "ECB_SDMX"
+                    else fetch_fred_graph(series_name, capture, session)
+                )
+            counts[series_name] = len(frame)
+            frames.append(frame)
+        except Exception as exc:
+            counts[series_name] = 0
+            errors.append(f"{series_name}: {type(exc).__name__}: {exc}")
     if not frames:
         return pd.DataFrame(), errors, counts
     return pd.concat(frames, ignore_index=True), errors, counts
