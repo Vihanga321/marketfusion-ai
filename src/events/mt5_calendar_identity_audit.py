@@ -124,7 +124,10 @@ def audit_identity(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def _month_key(series: pd.Series) -> pd.Series:
-    values = pd.to_datetime(series, utc=True, errors="raise")
+    # V0.4C reference periods can contain a mix of date-only and timestamp strings.
+    # Parse each value independently instead of letting pandas lock onto the first
+    # observed string format and reject later valid rows with a time component.
+    values = pd.to_datetime(series, utc=True, errors="raise", format="mixed")
     return values.dt.strftime("%Y-%m")
 
 
