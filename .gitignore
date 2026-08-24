@@ -12,9 +12,11 @@ htmlcov/
 data/mt5/ticks/
 data/mt5/history/
 data/mt5/calendar/
+data/mt5/continuous/
 data/processed/*.parquet
 data/dukascopy/
 data/provider_audit/
+reports/v05a_continuous_market_data_quality.txt
 jforex-event-exporter/target/
 .vscode/
 .idea/
