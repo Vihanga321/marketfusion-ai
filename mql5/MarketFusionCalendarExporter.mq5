@@ -70,20 +70,20 @@ bool WriteCalendarRow(const int handle,const MqlCalendarValue &value,const datet
    if(digits<0) digits=0;
    if(digits>8) digits=8;
 
-   int fields=FileWrite(handle,
-                        StringFormat("%I64u",value.id),
-                        StringFormat("%I64u",value.event_id),
-                        TimeField(value.time),
-                        TimeField(value.period),
-                        IntegerToString(value.revision),
-                        NumericField(value,0,digits),
-                        NumericField(value,1,digits),
-                        NumericField(value,2,digits),
-                        NumericField(value,3,digits),
-                        EnumToString(value.impact_type),
-                        event_name,event_code,country_code,currency,unit,importance,multiplier,
-                        IntegerToString(digits),time_mode,sector,frequency,source_url,
-                        TimeField(exported_at));
+   uint fields=FileWrite(handle,
+                         StringFormat("%I64u",value.id),
+                         StringFormat("%I64u",value.event_id),
+                         TimeField(value.time),
+                         TimeField(value.period),
+                         IntegerToString(value.revision),
+                         NumericField(value,0,digits),
+                         NumericField(value,1,digits),
+                         NumericField(value,2,digits),
+                         NumericField(value,3,digits),
+                         EnumToString(value.impact_type),
+                         event_name,event_code,country_code,currency,unit,importance,multiplier,
+                         IntegerToString(digits),time_mode,sector,frequency,source_url,
+                         TimeField(exported_at));
    return fields>0;
   }
 
