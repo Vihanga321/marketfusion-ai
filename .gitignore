@@ -11,6 +11,7 @@ htmlcov/
 *.parquet
 data/mt5/ticks/
 data/mt5/history/
+data/mt5/calendar/
 data/processed/*.parquet
 data/dukascopy/
 data/provider_audit/
