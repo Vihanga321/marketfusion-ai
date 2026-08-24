@@ -15,7 +15,8 @@ from src.dashboard.v07_contract import (
     MAX_CANDLE_LIMIT, MAX_HISTORY_LIMIT, PORT, REQUIRED_STATE_KEYS,
     STATE_STALE_SECONDS, TIMEFRAMES, TRADING_ROUTE_FRAGMENTS, V04D_EVENTS_FILE,
     V05A_STATUS_FILE, V05B_CONTEXT_FILE, V05B_STATUS_FILE, V05C_CANDIDATES_FILE,
-    V05C_ELIGIBILITY_FILE, V05C_TRAINING_FILE, V06_HISTORY_FILE, V06_STATE_FILE, VITE_ORIGINS,
+    V05C_ELIGIBILITY_FILE, V05C_TRAINING_FILE, V06_HISTORY_FILE, V06_STATE_FILE,
+    V08_STATUS_FILE, VITE_ORIGINS,
 )
 from src.dashboard.v07_market import load_candles
 
@@ -244,6 +245,26 @@ def research() -> dict[str, object]:
 @app.get("/api/system/version")
 def version() -> dict[str, object]:
     return {"api_contract": CONTRACT_VERSION, "state_contract": "v0.6c-unified-runtime-v1", "mode": "LOCALHOST_READ_ONLY", "trading_enabled": False}
+
+
+@app.get("/api/v08/status")
+def v08_status() -> dict[str, object]:
+    payload = _safe_json(V08_STATUS_FILE)
+    if payload:
+        return payload
+    return {
+        "contract_version": "v0.8-forward-shadow-monitor-v1", "status": "INSUFFICIENT_DATA",
+        "performance": {
+            "recorded_predictions": 0, "matured_outcomes": 0,
+            "horizons": {str(h): {"matured_count": 0, "directional_calls": 0, "wait_rate": None, "directional_accuracy": None, "brier": None, "sample_status": "INSUFFICIENT_DATA"} for h in (15, 60, 240)},
+            "wait": {"wait_rate": None}, "calibration_status": "NO_APPROVED_MODEL_DATA",
+            "market_drift_status": "INSUFFICIENT_DATA", "model_drift_status": "INSUFFICIENT_DATA",
+        },
+        "champions": {"15": "NONE", "60": "NONE", "240": "NONE"},
+        "provider_health": {"status": "INSUFFICIENT_DATA", "providers": {}, "uptime_percentage": {}},
+        "research": {"status": "AVAILABLE_NOT_RUN", "experiments": 0, "best_experiment": None, "decision": "INSUFFICIENT_DATA"},
+        "manual_execution_only": True, "trading_enabled": False,
+    }
 
 
 def trading_route_count() -> int:

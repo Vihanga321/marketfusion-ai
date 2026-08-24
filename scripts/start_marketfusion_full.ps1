@@ -38,3 +38,5 @@ Start-CollectorIfMissing 'v05a_collector' @('-m','src.marketdata.v05a_runner','-
 Start-CollectorIfMissing 'v05b_collector' @('-m','src.intelligence.v05b_runner','--interval','300') 'src.intelligence.v05b_runner'
 Write-Host 'V0.5C continuous training is intentionally NOT started.'
 & (Join-Path $PSScriptRoot 'start_marketfusion_dashboard.ps1') -NoBrowser:$NoBrowser
+Start-CollectorIfMissing 'v08_monitor' @('-m','src.evaluation.v08_runner','--continuous','--interval-seconds','300') 'src.evaluation.v08_runner'
+Write-Host 'V0.8 heavy model research is intentionally NOT started; run it manually or on a controlled weekly schedule.'

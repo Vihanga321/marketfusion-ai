@@ -1,0 +1,78 @@
+{
+  "feature_analysis": {
+    "15": {
+      "expanding_fit_top10_overlap": 0.5,
+      "method": "ELASTIC_NET_ABS_COEFFICIENT_DEVELOPMENT_TRAINING_ONLY",
+      "stability": "WATCH",
+      "top_features": [
+        "m1_spread_points",
+        "m1_tick_volume",
+        "m5_spread_median_60m",
+        "m5_return_5m",
+        "m5_spread_points",
+        "m15_return_240m",
+        "m5_tick_volume",
+        "h1_return_240m",
+        "m5_return_240m",
+        "m5_return_15m"
+      ]
+    },
+    "240": {
+      "expanding_fit_top10_overlap": 0.7,
+      "method": "ELASTIC_NET_ABS_COEFFICIENT_DEVELOPMENT_TRAINING_ONLY",
+      "stability": "STABLE",
+      "top_features": [
+        "m5_spread_points",
+        "h1_volatility_240m",
+        "is_london_ny_overlap",
+        "m5_spread_median_60m",
+        "m5_volatility_15m",
+        "m5_spread_max_60m",
+        "h1_volatility_1440m",
+        "m5_volatility_240m",
+        "m5_tick_volume",
+        "m15_volatility_60m"
+      ]
+    },
+    "60": {
+      "expanding_fit_top10_overlap": 0.5,
+      "method": "ELASTIC_NET_ABS_COEFFICIENT_DEVELOPMENT_TRAINING_ONLY",
+      "stability": "WATCH",
+      "top_features": [
+        "m1_spread_points",
+        "m5_spread_median_60m",
+        "is_new_york_session",
+        "m15_return_240m",
+        "is_asia_session",
+        "is_london_session",
+        "m5_return_15m",
+        "m15_volatility_60m",
+        "h1_return_60m",
+        "m15_volatility_240m"
+      ]
+    }
+  },
+  "horizons": {
+    "15": {
+      "holdout_start": "2026-08-17 22:00:00+00:00",
+      "selected_without_holdout": "ABLATE_SESSION_TIME",
+      "train_end": "2026-08-11 05:30:00+00:00",
+      "validation_end": "2026-08-17 21:40:00+00:00"
+    },
+    "240": {
+      "holdout_start": "2026-08-17 19:00:00+00:00",
+      "selected_without_holdout": "ABLATE_PRICE_RETURN",
+      "train_end": "2026-08-10 23:30:00+00:00",
+      "validation_end": "2026-08-17 14:55:00+00:00"
+    },
+    "60": {
+      "holdout_start": "2026-08-17 21:20:00+00:00",
+      "selected_without_holdout": "ABLATE_VOLUME",
+      "train_end": "2026-08-11 04:15:00+00:00",
+      "validation_end": "2026-08-17 20:15:00+00:00"
+    }
+  },
+  "random_shuffle": false,
+  "selection_uses_holdout": false,
+  "v05b_active": false
+}

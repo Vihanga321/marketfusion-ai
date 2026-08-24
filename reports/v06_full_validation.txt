@@ -1,7 +1,7 @@
 MARKETFUSION FULL LOCAL RUNTIME VALIDATION
 
-repository_commit: 265e179d80696786825e610e52cba941a60209a0
-tested_at_utc: 2026-08-24T12:45:56.330465+00:00
+repository_commit: f28e9c8fa445a519943dcba63c3a4cbee8205654
+tested_at_utc: 2026-08-24T14:25:08.157315+00:00
 
 SECURITY:
 repo_safety: PASS
@@ -25,7 +25,7 @@ V0.5A:
 status: PASS
 market_data_integrity: PASS
 causal_features: PASS
-matured_labels: {15: 8934, 60: 8862, 240: 8574}
+matured_labels: {15: 8953, 60: 8881, 240: 8593}
 daily_history: 32 rows / 31 finalized
 conflicts: 0
 
@@ -37,7 +37,7 @@ macro_sources_ok: 1
 macro_sources_degraded: us_10y_minus_2y, us_10y_yield, us_2y_yield, us_effective_fed_funds
 news_rows: 84
 macro_rows: 1
-context_rows: 7
+context_rows: 9
 
 V0.5C:
 dataset_gate: PASS
@@ -58,13 +58,13 @@ model_ids: NONE
 
 V0.6B:
 status: PASS_FAIL_CLOSED_NO_CHAMPION
-source_freshness: {'market': 'FRESH', 'model': 'FRESH', 'event': 'FRESH', 'intelligence': 'DEGRADED'}
+source_freshness: {'market': 'FRESH', 'model': 'FRESH', 'event': 'FRESH', 'intelligence': 'STALE'}
 session: OVERLAP
 market_regime: NORMAL
 spread_regime: NORMAL
 event_risk: NONE
-intelligence_status: DEGRADED
-reason_codes: NO_APPROVED_MODEL, INSUFFICIENT_FEATURES, INTELLIGENCE_DEGRADED
+intelligence_status: STALE
+reason_codes: NO_APPROVED_MODEL, INSUFFICIENT_FEATURES, INTELLIGENCE_STALE
 
 V0.6C:
 status: PASS_FAIL_CLOSED_NO_CHAMPION
@@ -72,11 +72,24 @@ action: WAIT
 confidence: VERY_LOW
 decision_gate: WAIT_NO_MODEL
 trade_window: NOT_APPLICABLE_WAIT
-next_reassessment_utc: 2026-08-24T12:50:00+00:00
-generated_at_utc: 2026-08-24T12:45:51.458696+00:00
-generated_at_asia_colombo: 2026-08-24T18:15:51.458696+05:30
+next_reassessment_utc: 2026-08-24T14:25:00+00:00
+generated_at_utc: 2026-08-24T14:24:27.450305+00:00
+generated_at_asia_colombo: 2026-08-24T19:54:27.450305+05:30
 trading_enabled: false
 manual_confirmation_required: true
+
+V0.8:
+status: PASS_MONITORING_NO_CHAMPION
+prediction_rows: 2
+outcome_rows: 1
+duplicate_predictions: 0
+mutation_conflicts: 0
+prediction_hash_mismatches: 0
+early_outcomes: 0
+outcome_binding_mismatches: 0
+performance_monitor: PASS
+drift_status: DEGRADED
+research_separation: RESEARCH_ONLY
 
 INTEGRATION:
 market_plus_intelligence_join: PASS
@@ -90,4 +103,4 @@ BLOCKERS:
 NONE
 
 NEXT_SAFE_STEP:
-Build the V0.7 read-only dashboard over the stable V0.6C state contract; keep execution and account access disabled.
+Continue V0.5A/V0.5B/V0.6/V0.8 forward collection and use V0.8 evidence to improve challengers. Do not promote a model until V0.5C promotion gates are actually met.

@@ -16,6 +16,7 @@ data/mt5/continuous/
 data/intelligence/
 data/inference/
 data/runtime/
+data/evaluation/
 *.pid
 *.lock
 data/processed/*.parquet
@@ -28,6 +29,7 @@ reports/v05b_free_source_network_diagnostics.txt
 reports/v05ab_local_integration_audit.txt
 reports/marketfusion_full_local_runtime_validation.txt
 models/v05c/
+models/v08/
 jforex-event-exporter/target/
 .vscode/
 .idea/

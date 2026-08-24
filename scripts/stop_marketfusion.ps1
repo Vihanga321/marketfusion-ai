@@ -8,6 +8,7 @@ $Allowed = @{
     'v06_runtime' = 'src.runtime.v06c_runner'
     'v07_api' = 'src.dashboard.v07_api'
     'v07_dashboard' = 'vite/bin/vite.js'
+    'v08_monitor' = 'src.evaluation.v08_runner'
 }
 if (-not (Test-Path -LiteralPath $PidRoot)) { Write-Host 'No MarketFusion V0.7 PID directory exists. Nothing to stop.'; exit 0 }
 foreach ($Name in $Allowed.Keys) {

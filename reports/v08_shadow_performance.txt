@@ -1,0 +1,33 @@
+MARKETFUSION V0.8 SHADOW PERFORMANCE
+
+scope: TRUE_FORWARD_SHADOW only
+profitability_claim: NO
+predictive_edge_claim: NO
+commission_status: UNKNOWN
+
+recorded_predictions: 2
+matured_outcome_rows: 1
+wait_rate: 1.0
+directional_calls: 0
+
+rolling_windows: last 20/50/100 outcomes and last 5/20 elapsed days
+significance: INSUFFICIENT_DATA
+
+intelligence_context: descriptive V0.5B health grouping only; activity categories unavailable unless captured causally in V0.6
+
+15m:
+matured: 1
+directional_accuracy: INSUFFICIENT_DATA
+brier: NO_APPROVED_MODEL_DATA
+status: INSUFFICIENT_DATA
+60m:
+matured: 0
+directional_accuracy: INSUFFICIENT_DATA
+brier: NO_APPROVED_MODEL_DATA
+status: INSUFFICIENT_DATA
+
+240m:
+matured: 0
+directional_accuracy: INSUFFICIENT_DATA
+brier: NO_APPROVED_MODEL_DATA
+status: INSUFFICIENT_DATA

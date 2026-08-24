@@ -113,3 +113,22 @@ export interface AuditedEventDetail { event_id: string | number | null; event_na
 export interface EventsResponse { status: string; events: AuditedEventDetail[] }
 export interface ResearchCandidate { family: string; balanced_accuracy: number; promotion_status: string }
 export interface ResearchState { status: string; approved_champions: number; candidates: Record<string, ResearchCandidate>; last_training_utc: string | null; market_core_rows: number | null; history_days: number | null; v05b_eligibility: string; live_surprise_samples: number; next_recommended_training: string }
+export interface V08HorizonPerformance { matured_count: number; directional_calls: number; wait_rate: number | null; directional_accuracy: number | null; brier: number | null; sample_status: string }
+export interface V08Status {
+  contract_version: string;
+  status: string;
+  performance: {
+    recorded_predictions: number;
+    matured_outcomes: number;
+    horizons: Record<string, V08HorizonPerformance>;
+    wait: { wait_rate: number | null };
+    calibration_status: string;
+    market_drift_status: string;
+    model_drift_status: string;
+  };
+  champions: Record<string, string>;
+  provider_health: { status: string; providers: Record<string, string>; uptime_percentage: Record<string, number> };
+  research: { status: string; experiments: number; best_experiment: string | null; decision: string };
+  manual_execution_only: true;
+  trading_enabled: false;
+}

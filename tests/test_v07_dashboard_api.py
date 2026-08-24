@@ -115,6 +115,12 @@ class V07DashboardApiTests(unittest.TestCase):
         payload = self.client.get("/api/system/version").json()
         self.assertFalse(payload["trading_enabled"])
 
+    def test_18_v08_monitor_endpoint_is_read_only_and_fail_closed(self):
+        payload = self.client.get("/api/v08/status").json()
+        self.assertFalse(payload["trading_enabled"])
+        self.assertTrue(payload["manual_execution_only"])
+        self.assertIn(payload["status"], {"INSUFFICIENT_DATA", "PASS_MONITORING_NO_CHAMPION", "PASS_SHADOW_EVALUATION", "PASS_SHADOW_EVALUATION_DEGRADED_PROVIDERS"})
+
 
 if __name__ == "__main__":
     unittest.main()

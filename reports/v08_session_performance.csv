@@ -1,0 +1,2 @@
+session,horizon_minutes,sample_count,wait_rate,directional_coverage,directional_accuracy,brier,cost_aware_research_metric,status
+LONDON_NEW_YORK_OVERLAP,15,1,1.0,0.0,,,,INSUFFICIENT_SAMPLE

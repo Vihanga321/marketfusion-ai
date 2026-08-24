@@ -19,6 +19,7 @@ V04D_EVENTS_FILE = ROOT / "data" / "mt5" / "calendar" / "v04d_live_verified_cons
 V05C_CANDIDATES_FILE = ROOT / "reports" / "v05c_candidate_results.csv"
 V05C_TRAINING_FILE = ROOT / "reports" / "v05c_training_quality.txt"
 V05C_ELIGIBILITY_FILE = ROOT / "reports" / "v05c_feature_group_eligibility.txt"
+V08_STATUS_FILE = ROOT / "data" / "evaluation" / "v08" / "latest_status.json"
 MAX_CANDLE_LIMIT = 1000
 DEFAULT_CANDLE_LIMIT = 300
 MAX_HISTORY_LIMIT = 1000

@@ -1,0 +1,44 @@
+MARKETFUSION V0.8 FORWARD SHADOW CONTRACT
+
+contract: v0.8-forward-shadow-monitor-v1
+scope: TRUE_FORWARD_SHADOW
+historical_research_scope: BACKTEST_RESEARCH
+trading_execution: DISABLED_NOT_IMPLEMENTED
+manual_execution_only: true
+account_data: FORBIDDEN
+credential_data: FORBIDDEN
+
+prediction_ledger: data/evaluation/v08/shadow_predictions.parquet
+outcome_ledger: data/evaluation/v08/shadow_outcomes.parquet
+window_ledger: data/evaluation/v08/shadow_window_outcomes.parquet
+provider_uptime_ledger: data/evaluation/v08/provider_uptime.parquet
+mutation_quarantine: data/evaluation/v08/conflicts/
+
+prediction_uniqueness: symbol + decision_timestamp_utc
+prediction_payload_integrity: canonical SHA256
+same_payload_duplicate: DEDUPLICATE
+changed_payload_duplicate: PREDICTION_MUTATION_CONFLICT
+original_prediction_overwrite: FORBIDDEN
+outcomes_inside_prediction_payload: FORBIDDEN
+retroactive_prediction_generation: FORBIDDEN
+maximum_forward_record_delay_minutes: 10
+
+horizons_minutes: 15,60,240
+future_timestamp_rule: decision_timestamp_utc + exact horizon
+missing_market_data_policy: NO_INTERPOLATION
+future_spread_use: FORBIDDEN
+commission_status: UNKNOWN
+performance_label: DESCRIPTIVE_SHADOW_PERFORMANCE
+profitability_claim: NO
+predictive_edge_claim: NO
+
+minimum_forward_shadow_rows: 100
+minimum_directional_calls: 50
+minimum_calibration_rows: 100
+minimum_regime_rows: 30
+minimum_promotion_monitor_rows: 250
+
+v08_registry_write: FORBIDDEN
+formal_promotion_owner: V0.5C
+heavy_research_schedule: MANUAL_OR_WEEKLY
+continuous_monitor_schedule_seconds: 300

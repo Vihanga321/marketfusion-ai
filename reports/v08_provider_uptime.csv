@@ -1,0 +1,6 @@
+provider,successful_cycles,failed_cycles,availability_percentage,last_success_utc,last_failure_utc
+BLS,2,0,100.0,2026-08-24 14:19:54.521865+00:00,
+ECB,2,0,100.0,2026-08-24 14:19:54.521865+00:00,
+FED,2,0,100.0,2026-08-24 14:19:54.521865+00:00,
+FRED,0,2,0.0,,2026-08-24 14:19:54.521865+00:00
+GDELT,0,2,0.0,,2026-08-24 14:19:54.521865+00:00

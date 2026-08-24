@@ -1,0 +1,4 @@
+horizon_minutes,bin,rows,mean_confidence,observed_frequency,brier,log_loss,ece,mce,status
+15,ALL,0,,,,,,,NO_APPROVED_MODEL_DATA
+60,ALL,0,,,,,,,NO_APPROVED_MODEL_DATA
+240,ALL,0,,,,,,,NO_APPROVED_MODEL_DATA

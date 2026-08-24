@@ -23,6 +23,21 @@ Open: `http://127.0.0.1:5173`
 
 The current fail-closed state is intentionally presented as WAIT / VERY LOW with no approved models and no trade window. See [the V0.7 dashboard contract](docs/V07_DASHBOARD.md) for endpoints, polling, and safety behavior.
 
+## V0.8 forward shadow monitoring
+
+V0.8 records only V0.6 decisions observed before their outcomes mature, keeps the prediction ledger immutable, and attaches exact V0.5A outcomes separately. Its performance, calibration, drift, WAIT, provider-uptime, and research reports are descriptive and sample-gated. It never reconstructs old predictions using newer models and cannot promote a champion.
+
+```powershell
+.\scripts\run_v08_tests.ps1
+.\scripts\run_v08_once.ps1
+.\scripts\show_v08_status.ps1
+
+# Heavy research is explicit/manual and never part of browser polling.
+.\scripts\run_v08_model_research.ps1
+```
+
+The complete runtime launcher includes the lightweight five-minute V0.8 monitor. See [V0.8 shadow-performance documentation](docs/V08_SHADOW_PERFORMANCE.md) for causal recording, maturity, metric, drift, and research-separation rules.
+
 ## Versions
 
 - **V0.1:** Yahoo Finance daily baseline. Preserved because validation exposed a candle-data artifact and a misleading high apparent accuracy.

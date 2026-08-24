@@ -15,7 +15,7 @@ export default function App() {
   const { state, connection, lastSuccess } = useMarketFusionState();
   const [timeframe, setTimeframe] = useState<Timeframe>("M5");
   const { candles, status: candleStatus } = useCandles(timeframe);
-  const { market: quote, intelligence, research, events } = useSupplementary();
+  const { market: quote, intelligence, research, events, monitoring } = useSupplementary();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
@@ -140,6 +140,14 @@ export default function App() {
 
       <Panel title="Daily Learning" eyebrow="CONTROLLED — NOT CONTINUOUS">
         <div className="metric-grid compact"><Metric label="LAST TRAINING" value={localTime(research?.last_training_utc, true)} /><Metric label="MODEL PROMOTION" value="NONE" tone="warn" /><Metric label="MARKET CORE ROWS" value={research?.market_core_rows ?? dash} sub={research?.history_days == null ? undefined : `${research.history_days} history days`} /><Metric label="V0.5B ELIGIBILITY" value={label(research?.v05b_eligibility)} /><Metric label="LIVE SURPRISES" value={research?.live_surprise_samples ?? dash} /><Metric label="NEXT TRAINING" value={label(research?.next_recommended_training)} /></div>
+      </Panel>
+
+      <Panel title="Shadow Performance" eyebrow="V0.8 TRUE FORWARD MONITORING">
+        <div className="metric-grid compact"><Metric label="STATUS" value={label(monitoring?.status)} /><Metric label="RECORDED" value={monitoring?.performance.recorded_predictions ?? dash} /><Metric label="MATURED" value={monitoring?.performance.matured_outcomes ?? dash} /><Metric label="WAIT RATE" value={probability(monitoring?.performance.wait.wait_rate)} /><Metric label="CALIBRATION" value={label(monitoring?.performance.calibration_status)} /><Metric label="MARKET DRIFT" value={label(monitoring?.performance.market_drift_status)} /></div>
+        <div className="research-list">{[15,60,240].map(horizon => { const item = monitoring?.performance.horizons[String(horizon)]; return <article key={horizon}><span>{horizon === 60 ? "1H" : horizon === 240 ? "4H" : "15M"}</span><b>{label(item?.sample_status)}</b><small>{item?.directional_calls ?? 0} directional calls · accuracy {probability(item?.directional_accuracy)}</small><em>Brier {number(item?.brier, 4)}</em></article>; })}</div>
+        <div className="approval-divider"><ShieldCheck size={18} /><b>LIVE CHAMPIONS: {[15,60,240].map(h => monitoring?.champions[String(h)] ?? "NONE").join(" / ")}</b></div>
+        <h3 className="section-label">PROVIDER UPTIME</h3><div className="provider-row">{Object.entries(monitoring?.provider_health.uptime_percentage ?? {}).map(([name,value]) => <StatusDot key={name} label={name} value={`${value.toFixed(1)}%`} />)}</div>
+        <h3 className="section-label">MODEL RESEARCH · RESEARCH ONLY</h3><p className="muted-copy">{monitoring?.research.best_experiment ?? "No completed experiment selected"} · {label(monitoring?.research.decision)}</p>
       </Panel>
 
       <Panel title="Historical Memory" eyebrow="V0.4B DIAGNOSTIC CONTEXT">

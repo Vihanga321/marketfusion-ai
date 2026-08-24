@@ -43,6 +43,7 @@ try {
     $V06ATests = Invoke-MarketFusionStage '3e. V0.6A shadow-inference validation' { & (Join-Path $PSScriptRoot 'run_v06a_tests.ps1') }
     $V06BTests = Invoke-MarketFusionStage '3f. V0.6B/V0.6C fusion-runtime validation' { & (Join-Path $PSScriptRoot 'run_v06b_tests.ps1') }
     $V07Tests = Invoke-MarketFusionStage '3g. V0.7 API contract, dashboard safety, tests, and build' { & (Join-Path $PSScriptRoot 'run_v07_tests.ps1') }
+    $V08Tests = Invoke-MarketFusionStage '3h. V0.8 deterministic ledger, metrics, drift, and research-separation validation' { & (Join-Path $PSScriptRoot 'run_v08_tests.ps1') }
     $Mt5 = Invoke-MarketFusionStage '4. Read-only MT5 connectivity' { & $Python scripts\local_runtime_validation.py mt5 }
     $V05ACycle = Invoke-MarketFusionStage '5. V0.5A one-cycle validation' { & (Join-Path $PSScriptRoot 'run_v05a_once.ps1') }
 
@@ -70,6 +71,7 @@ try {
     $V06ACycle = Invoke-MarketFusionStage '7c. V0.6A one shadow cycle' { & (Join-Path $PSScriptRoot 'run_v06a_once.ps1') }
     $V06BCycle = Invoke-MarketFusionStage '7d. V0.6B one advisory cycle' { & (Join-Path $PSScriptRoot 'run_v06b_once.ps1') }
     $V06CCycle = Invoke-MarketFusionStage '7e. V0.6C one unified cycle' { & (Join-Path $PSScriptRoot 'run_v06c_once.ps1') }
+    $V08Cycle = Invoke-MarketFusionStage '7f. V0.8 one lightweight forward-monitor cycle' { & (Join-Path $PSScriptRoot 'run_v08_once.ps1') }
 
     Write-Host "`n=== 8. V0.5A + V0.5B integration and final audit ==="
     & $Python scripts\local_runtime_validation.py audit `
@@ -80,13 +82,15 @@ try {
         --v06a-tests $V06ATests `
         --v06b-tests $V06BTests `
         --v07-tests $V07Tests `
+        --v08-tests $V08Tests `
         --mt5 $Mt5 `
         --v05a-cycle $V05ACycle `
         --v04d $V04D `
         --v05b-cycle $V05BCycle `
         --v06a-cycle $V06ACycle `
         --v06b-cycle $V06BCycle `
-        --v06c-cycle $V06CCycle
+        --v06c-cycle $V06CCycle `
+        --v08-cycle $V08Cycle
     $AuditExit = $LASTEXITCODE
 
     Write-Host "`n=== 8b. V0.7 dashboard validation report ==="

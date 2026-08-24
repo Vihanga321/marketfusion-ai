@@ -46,6 +46,14 @@ from src.learning.v05c_registry import load_registry as load_v05c_registry, vali
 from src.inference.v06a_contract import LATEST_STATUS_FILE as V06A_STATUS_FILE, REQUIRED_FEATURES as V06A_REQUIRED_FEATURES
 from src.fusion.v06b_contract import LATEST_ADVISORY_FILE as V06B_STATUS_FILE
 from src.runtime.v06c_contract import LATEST_STATE_FILE as V06C_STATE_FILE
+from src.evaluation.v08_contract import (
+    CONFLICT_DIR as V08_CONFLICT_DIR,
+    LATEST_STATUS_FILE as V08_STATUS_FILE,
+    OUTCOMES_FILE as V08_OUTCOMES_FILE,
+    PREDICTIONS_FILE as V08_PREDICTIONS_FILE,
+    SOURCE_LABEL as V08_SOURCE_LABEL,
+)
+from src.evaluation.v08_ledger import prediction_sha as v08_prediction_sha
 from src.marketdata.v05a_contract import (
     CONFLICT_DIR,
     FEATURE_COLUMNS,
@@ -535,6 +543,38 @@ def _v06_audit() -> tuple[dict[str, object], list[str]]:
     return payload, failures
 
 
+def _v08_audit() -> tuple[dict[str, object], list[str]]:
+    failures: list[str] = []
+    status = json.loads(V08_STATUS_FILE.read_text(encoding="utf-8")) if V08_STATUS_FILE.exists() else {}
+    predictions = pd.read_parquet(V08_PREDICTIONS_FILE) if V08_PREDICTIONS_FILE.exists() else pd.DataFrame()
+    outcomes = pd.read_parquet(V08_OUTCOMES_FILE) if V08_OUTCOMES_FILE.exists() else pd.DataFrame()
+    duplicates = int(predictions["decision_timestamp_utc"].duplicated().sum()) if not predictions.empty else 0
+    conflicts = len(list(V08_CONFLICT_DIR.glob("*.parquet"))) if V08_CONFLICT_DIR.exists() else 0
+    hash_mismatches = 0
+    if not predictions.empty:
+        hash_mismatches = sum(v08_prediction_sha(row.to_dict()) != str(row["prediction_payload_sha256"]) for _, row in predictions.iterrows())
+        if not predictions["source_label"].eq(V08_SOURCE_LABEL).all():
+            failures.append("V0.8 prediction ledger mixed forward and research labels")
+    early = 0
+    binding_mismatches = 0
+    if not outcomes.empty:
+        early = int((pd.to_datetime(outcomes["matured_at_utc"], utc=True) < pd.to_datetime(outcomes["future_timestamp_utc"], utc=True)).sum())
+        valid_bindings = set(zip(predictions.get("prediction_id", []), predictions.get("prediction_payload_sha256", [])))
+        binding_mismatches = sum((row["prediction_id"], row["prediction_payload_sha256"]) not in valid_bindings for _, row in outcomes.iterrows())
+    if duplicates or conflicts or hash_mismatches or early or binding_mismatches:
+        failures.append("V0.8 immutable ledger or maturity audit failed")
+    allowed = {"PASS_MONITORING_NO_CHAMPION", "PASS_SHADOW_EVALUATION", "PASS_SHADOW_EVALUATION_DEGRADED_PROVIDERS", "INSUFFICIENT_DATA"}
+    if status.get("status") not in allowed:
+        failures.append("V0.8 performance monitor status is unavailable or failed")
+    return {
+        "status": status.get("status", "NOT_RUN"), "predictions": len(predictions), "outcomes": len(outcomes),
+        "duplicates": duplicates, "conflicts": conflicts, "hash_mismatches": hash_mismatches,
+        "early": early, "binding_mismatches": binding_mismatches,
+        "drift": ((status.get("performance") or {}).get("market_drift_status", "INSUFFICIENT_DATA")),
+        "research": ((status.get("research") or {}).get("status", "AVAILABLE_NOT_RUN")),
+    }, failures
+
+
 def full_audit(args: argparse.Namespace) -> int:
     v05a, failures_a = _v05a_audit()
     v04d, failures_d = _v04d_audit(args.v04d)
@@ -542,16 +582,17 @@ def full_audit(args: argparse.Namespace) -> int:
     integration, failures_i = _integration_audit()
     v05c, failures_c = _v05c_audit()
     v06, failures_6 = _v06_audit()
+    v08, failures_8 = _v08_audit()
     mt5 = _mt5_report_values()
-    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle") if getattr(args, name) != "PASS"]
+    stage_failures = [name for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "v08_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle", "v08_cycle") if getattr(args, name) != "PASS"]
     if args.v04d == "FAIL":
         stage_failures.append("v04d")
-    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c + failures_6
+    blockers = stage_failures + failures_a + failures_d + failures_b + failures_i + failures_c + failures_6 + failures_8
     degraded = v05b["status"] == "PASS_DEGRADED"
     final = "FAIL" if blockers else ("PASS_FAIL_CLOSED_NO_CHAMPION" if int(v06["champion_count"]) == 0 else "PASS_DEGRADED" if degraded else "PASS")
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     tested_at = pd.Timestamp.now(tz="UTC").isoformat()
-    next_step = "V0.8 Shadow-performance monitoring / model improvement."
+    next_step = "Continue V0.5A/V0.5B/V0.6/V0.8 forward collection and use V0.8 evidence to improve challengers. Do not promote a model until V0.5C promotion gates are actually met."
     lines = [
         "MARKETFUSION FULL LOCAL RUNTIME VALIDATION", "", f"repository_commit: {commit}", f"tested_at_utc: {tested_at}", "",
         "SECURITY:", f"repo_safety: {args.repo_safety}", "credentials_exposed_by_output: NO", "trading_execution_present: NO", "",
@@ -581,6 +622,10 @@ def full_audit(args: argparse.Namespace) -> int:
         f"decision_gate: {v06['decision_gate']}", f"trade_window: {v06['trade_window']}",
         f"next_reassessment_utc: {v06['next_reassessment']}", f"generated_at_utc: {v06['utc_time']}",
         f"generated_at_asia_colombo: {v06['asia_colombo_time']}", "trading_enabled: false", "manual_confirmation_required: true", "",
+        "V0.8:", f"status: {v08['status']}", f"prediction_rows: {v08['predictions']}", f"outcome_rows: {v08['outcomes']}",
+        f"duplicate_predictions: {v08['duplicates']}", f"mutation_conflicts: {v08['conflicts']}", f"prediction_hash_mismatches: {v08['hash_mismatches']}",
+        f"early_outcomes: {v08['early']}", f"outcome_binding_mismatches: {v08['binding_mismatches']}",
+        f"performance_monitor: {args.v08_cycle}", f"drift_status: {v08['drift']}", f"research_separation: {v08['research']}", "",
         "INTEGRATION:", f"market_plus_intelligence_join: {integration['status']}",
         f"future_information_violations: {integration['future']}", f"outcome_feature_leaks: {integration['leaks']}", "",
         "FINAL_STATUS:", final, "", "BLOCKERS:", *(blockers or ["NONE"]), "", "NEXT_SAFE_STEP:", next_step,
@@ -624,7 +669,7 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("mt5")
     sub.add_parser("providers")
     audit = sub.add_parser("audit")
-    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle"):
+    for name in ("repo_safety", "v05a_tests", "v05b_tests", "v05c_tests", "v06a_tests", "v06b_tests", "v07_tests", "v08_tests", "mt5", "v05a_cycle", "v05b_cycle", "v06a_cycle", "v06b_cycle", "v06c_cycle", "v08_cycle"):
         audit.add_argument(f"--{name.replace('_', '-')}", choices=("PASS", "FAIL"), required=True)
     audit.add_argument("--v04d", choices=("PASS", "FAIL", "SKIPPED"), required=True)
     return result
