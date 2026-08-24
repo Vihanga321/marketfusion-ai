@@ -36,13 +36,15 @@ FORBIDDEN_TRADING_PATTERNS = {
 # BLS_API_KEY= and incorrectly consume the next Markdown/code-fence line.
 CREDENTIAL_ASSIGNMENT = re.compile(
     r"(?im)^[ \t]*(FRED_API_KEY|BLS_API_KEY|OANDA_API_TOKEN|OANDA_ACCOUNT_ID|"
-    r"DUKASCOPY_USER|DUKASCOPY_PASSWORD)[ \t]*=[ \t]*([^#\r\n]*)[ \t]*$"
+    r"DUKASCOPY_USER|DUKASCOPY_PASSWORD|TRADING_ECONOMICS_API_KEY)[ \t]*=[ \t]*"
+    r"([^#\r\n]*)[ \t]*$"
 )
 ALLOWED_PLACEHOLDER_FRAGMENTS = (
     "replace_with_",
     "your_private_",
     "your_personal_",
     "your_v20_",
+    "your_trading_economics_",
     "...",
 )
 
@@ -52,6 +54,7 @@ REQUIRED_GITIGNORE_LINES = {
     "!.env.example",
     "*.parquet",
     "data/dukascopy/",
+    "data/provider_audit/",
     "data/mt5/ticks/",
     "data/mt5/history/",
     "jforex-event-exporter/target/",

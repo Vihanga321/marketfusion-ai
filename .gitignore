@@ -13,6 +13,7 @@ data/mt5/ticks/
 data/mt5/history/
 data/processed/*.parquet
 data/dukascopy/
+data/provider_audit/
 jforex-event-exporter/target/
 .vscode/
 .idea/
