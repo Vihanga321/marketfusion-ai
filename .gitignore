@@ -14,6 +14,7 @@ data/mt5/history/
 data/mt5/calendar/
 data/mt5/continuous/
 data/intelligence/
+data/inference/
 data/processed/*.parquet
 data/dukascopy/
 data/provider_audit/
