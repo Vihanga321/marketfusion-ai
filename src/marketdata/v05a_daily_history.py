@@ -24,7 +24,10 @@ def build_daily_history(m5: pd.DataFrame, now_utc: object | None = None) -> pd.D
     df["bar_close_utc"] = pd.to_datetime(df["bar_close_utc"], utc=True, errors="raise")
     for column in ("open", "high", "low", "close", "tick_volume", "spread_points"):
         df[column] = pd.to_numeric(df[column], errors="raise")
-    df["date_utc"] = df["bar_close_utc"].dt.strftime("%Y-%m-%d")
+    # Calendar-day ownership follows bar-open time. The 23:55-00:00 M5 candle
+    # belongs to the day in which it opened, so the previous day is complete once
+    # that candle closes at midnight.
+    df["date_utc"] = df["bar_open_utc"].dt.strftime("%Y-%m-%d")
     df["return_5m"] = df["close"].pct_change()
     consecutive = df["bar_close_utc"].diff().eq(pd.Timedelta(minutes=5))
     df.loc[~consecutive, "return_5m"] = pd.NA
