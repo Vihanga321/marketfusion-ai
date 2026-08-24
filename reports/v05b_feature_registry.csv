@@ -1,0 +1,10 @@
+feature_family,feature_pattern,availability_rule,notes
+news_volume,news_{15|60|240|1440}m_count,first_observed_utc<=decision_timestamp_utc,Total newly observed relevant metadata in rolling window
+news_authority,news_{window}m_official_count,first_observed_utc<=decision_timestamp_utc,Official Fed/ECB/BLS feed count
+news_discovery,news_{window}m_gdelt_count,first_observed_utc<=decision_timestamp_utc,GDELT article metadata count only
+news_relevance,news_{window}m_{usd_relevant|eur_relevant}_count,first_observed_utc<=decision_timestamp_utc,Deterministic keyword/source-region relevance
+news_impact,news_{window}m_high_impact_flag_count,first_observed_utc<=decision_timestamp_utc,Deterministic high-impact topic flag count
+news_topics,news_{window}m_topic_{central_bank|rates|inflation|labor|growth|risk}_count,first_observed_utc<=decision_timestamp_utc,Descriptive topic counts; not direction predictions
+macro_level,macro_{series}_value,first_observed_utc<=decision_timestamp_utc,Latest causally observed current-endpoint value
+macro_age,macro_{series}_age_hours,first_observed_utc<=decision_timestamp_utc,Hours since MarketFusion first observed the selected value
+macro_policy_spread,macro_policy_rate_spread_us_minus_ecb_pctpt,both component first_observed_utc<=decision_timestamp_utc,U.S. effective fed funds minus ECB main refinancing rate
