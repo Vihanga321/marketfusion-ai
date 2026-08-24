@@ -60,6 +60,7 @@ REQUIRED_GITIGNORE_LINES = {
     "data/mt5/ticks/",
     "data/mt5/history/",
     "data/mt5/calendar/",
+    "data/mt5/continuous/",
     "jforex-event-exporter/target/",
 }
 
