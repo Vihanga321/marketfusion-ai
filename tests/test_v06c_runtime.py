@@ -58,7 +58,14 @@ class V06CRuntimeTests(unittest.TestCase):
         item = advisory("WAIT_STALE_MARKET_DATA", "PASS_WAIT"); item["market"]["freshness"]["status"] = "STALE"
         self.assertEqual(assemble_state(item, {}, {}, {}, {"status": "AVAILABLE_EMPTY"})["system"]["status"], "FAIL_CLOSED")
 
-    def test_09_history_appends_one_unique_decision(self):
+    def test_09_weekend_session_is_propagated_without_asia(self):
+        item = advisory()
+        item["market"]["session"] = "WEEKEND"
+        result = assemble_state(item, {}, {}, {}, {"status": "AVAILABLE_EMPTY"})
+        self.assertEqual(result["market"]["session"], "WEEKEND")
+        self.assertNotEqual(result["market"]["session"], "ASIA")
+
+    def test_10_history_appends_one_unique_decision(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
             with patch("src.runtime.v06c_engine.LATEST_STATE_FILE", root / "latest.json"), patch("src.runtime.v06c_engine.STATE_HISTORY_FILE", root / "history.parquet"):

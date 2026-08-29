@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.fusion.v06b_contract import EVENT_POLICY, MIN_REGIME_HISTORY_ROWS, TARGET_EVENT_CODES, TARGET_EVENT_NAMES
+from src.marketdata.market_calendar import forex_session_state
 
 
 def utc(value: object) -> pd.Timestamp:
@@ -31,7 +32,9 @@ def freshness(observed_at: object | None, now_utc: object, max_age_minutes: floa
     return {"status": status, "observed_at_utc": utc(observed_at).isoformat(), "age_minutes": age}
 
 
-def classify_session(row: pd.Series | dict[str, Any]) -> str:
+def classify_session(row: pd.Series | dict[str, Any], now_utc: object | None = None) -> str:
+    if now_utc is not None:
+        return str(forex_session_state(now_utc)["current_session"])
     if bool(row.get("is_london_ny_overlap", 0)):
         return "OVERLAP"
     if bool(row.get("is_asia_session", 0)):

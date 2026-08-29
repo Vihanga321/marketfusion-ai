@@ -259,7 +259,7 @@ def build_advisory(
         "action": action, "action_meaning": action_meaning, "direction": direction,
         "confidence": confidence, "confidence_meaning": confidence_meaning, "decision_gate": wait_gate,
         "manual_confirmation_required": MANUAL_CONFIRMATION_REQUIRED, "trading_enabled": TRADING_ENABLED,
-        "market": {"freshness": market_fresh, "session": classify_session(row), "regime": regime, "spread": spread, "close": row.get("m5_close")},
+        "market": {"freshness": market_fresh, "session": classify_session(row, now), "regime": regime, "spread": spread, "close": row.get("m5_close")},
         "model": {"source_status": shadow.get("status"), "freshness": inference_fresh, "horizons": shadow.get("horizons") or {}, "fusion": fusion},
         "event": {**event_risk, "freshness": event_fresh}, "intelligence": context_summary,
         "memory": _memory_context(),

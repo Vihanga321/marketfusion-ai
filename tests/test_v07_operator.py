@@ -46,6 +46,23 @@ class MarketCalendarTests(unittest.TestCase):
         self.assertEqual(value["status"], "OPENING_SOON")
         self.assertEqual(value["next_market_open_utc"], "2026-08-30T21:00:00+00:00")
 
+    def test_sunday_before_open_is_weekend(self):
+        value = forex_session_state("2026-08-30T20:59:59Z")
+        self.assertEqual(value["current_session"], "WEEKEND")
+
+    def test_sunday_open_transitions_to_sydney(self):
+        value = forex_session_state("2026-08-30T21:00:00Z")
+        self.assertEqual(value["current_session"], "INTERSESSION")
+        self.assertEqual(value["next_session"], "SYDNEY")
+
+    def test_monday_asian_hours_are_open(self):
+        value = forex_session_state("2026-08-31T02:00:00Z")
+        self.assertEqual(value["current_session"], "SYDNEY + TOKYO")
+
+    def test_dst_sessions_use_zoneinfo(self):
+        self.assertEqual(forex_session_state("2026-07-01T13:00:00Z")["current_session"], "LONDON + NEW_YORK")
+        self.assertEqual(forex_session_state("2026-01-15T14:00:00Z")["current_session"], "LONDON + NEW_YORK")
+
 
 class SessionTests(unittest.TestCase):
     def test_summer_london_new_york_overlap(self):

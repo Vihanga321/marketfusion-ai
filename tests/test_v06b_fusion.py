@@ -10,6 +10,7 @@ from src.fusion.v06b_risk import classify_event_risk, classify_market_regime, cl
 
 
 NOW = pd.Timestamp("2026-08-24T12:00:00Z")
+WEEKEND_NOW = pd.Timestamp("2026-08-29T12:00:00Z")
 
 
 def market_frame(count: int = 30, complete: bool = True) -> pd.DataFrame:
@@ -150,7 +151,11 @@ class V06BFusionTests(unittest.TestCase):
         payload = build_advisory(frame, shadow(), events(), {}, {"captured_at_utc": NOW.isoformat()}, NOW)
         self.assertEqual((payload["action"], payload["confidence"], payload["decision_gate"]), ("WAIT", "VERY_LOW", "WAIT_NO_MODEL"))
 
-    def test_32_intelligence_never_overrides_direction(self):
+    def test_32_weekend_advisory_never_uses_stale_row_session(self):
+        payload = build_advisory(market_frame(), shadow(), events(), {}, {"captured_at_utc": WEEKEND_NOW.isoformat()}, WEEKEND_NOW)
+        self.assertEqual(payload["market"]["session"], "WEEKEND")
+
+    def test_33_intelligence_never_overrides_direction(self):
         frame = market_frame()
         payload = build_advisory(frame, shadow({"15": horizon(), "60": horizon(), "240": horizon()}), events(), {"news_15m_count": 99}, {"captured_at_utc": NOW.isoformat()}, NOW)
         self.assertFalse(payload["intelligence"]["directional_override"])
