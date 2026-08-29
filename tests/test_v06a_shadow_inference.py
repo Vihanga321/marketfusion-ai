@@ -13,6 +13,7 @@ from src.inference.v06a_engine import (
     select_latest_champion,
     target_event_guard_from_frame,
 )
+from src.learning.v05c_dataset import validate_availability, validate_latest_snapshot_availability
 
 
 NOW = pd.Timestamp("2026-08-24T12:00:00Z")
@@ -52,6 +53,40 @@ class V06AShadowInferenceTests(unittest.TestCase):
         frame.loc[0, "m1_available_from_utc"] = NOW + pd.Timedelta(minutes=1)
         with self.assertRaises(ValueError):
             latest_market_snapshot(frame, NOW)
+
+    def test_inference_latest_window_ignores_older_future_records(self):
+        recent = market_frame(NOW - pd.Timedelta(minutes=5))
+        for column in ("m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"):
+            recent.loc[0, column] = NOW - pd.Timedelta(minutes=5)
+        old = market_frame(NOW - pd.Timedelta(days=30))
+        old.loc[0, "m1_available_from_utc"] = NOW + pd.Timedelta(hours=1)
+        frame = pd.concat([old, recent], ignore_index=True)
+        self.assertEqual(validate_latest_snapshot_availability(frame.sort_values("decision_timestamp_utc").tail(1), NOW), 0)
+
+    def test_validate_availability_uses_datetime_tz_and_rejects_malformed_values(self):
+        frame = market_frame()
+        frame["m1_available_from_utc"] = pd.to_datetime(frame["m1_available_from_utc"], utc=True)
+        frame["m5_available_from_utc"] = pd.to_datetime(frame["m5_available_from_utc"], utc=True)
+        frame["m15_available_from_utc"] = pd.to_datetime(frame["m15_available_from_utc"], utc=True)
+        frame["h1_available_from_utc"] = pd.to_datetime(frame["h1_available_from_utc"], utc=True)
+        self.assertEqual(validate_availability(frame), 0)
+
+        malformed = frame.copy().astype({
+            "m1_available_from_utc": "datetime64[ns, UTC]",
+            "m5_available_from_utc": "datetime64[ns, UTC]",
+            "m15_available_from_utc": "datetime64[ns, UTC]",
+            "h1_available_from_utc": "datetime64[ns, UTC]",
+            "decision_timestamp_utc": "datetime64[ns, UTC]",
+        })
+        malformed["m1_available_from_utc"] = malformed["m1_available_from_utc"].astype(object)
+        malformed.loc[0, "m1_available_from_utc"] = "not-a-timestamp"
+        with self.assertRaises((ValueError, TypeError)):
+            validate_availability(malformed)
+
+        future = frame.copy()
+        future.loc[0, "m1_available_from_utc"] = NOW + pd.Timedelta(minutes=1)
+        with self.assertRaises(ValueError):
+            validate_availability(future)
 
     def test_future_decision_timestamp_is_rejected(self):
         with self.assertRaises(RuntimeError):

@@ -47,6 +47,8 @@ def validate_feature_registry(features: tuple[str, ...] | list[str]) -> None:
 
 
 def _utc(series: pd.Series) -> pd.Series:
+    if isinstance(series.dtype, pd.DatetimeTZDtype):
+        return series.dt.tz_convert("UTC")
     return pd.to_datetime(series, utc=True, errors="raise")
 
 
@@ -56,10 +58,37 @@ def validate_availability(frame: pd.DataFrame) -> int:
     for column in ("m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"):
         if column not in frame:
             raise ValueError(f"Missing availability column: {column}")
-        available = pd.to_datetime(frame[column], utc=True, errors="coerce")
+        available = _utc(frame[column])
         violations += int((available.notna() & available.gt(decision)).sum())
     if violations:
         raise ValueError(f"Future feature availability violations: {violations}")
+    return violations
+
+
+def validate_latest_snapshot_availability(frame: pd.DataFrame, now_utc: object | None = None, validation_window_rows: int = 1) -> int:
+    if frame.empty:
+        raise ValueError("Feature store is empty")
+    work = frame.copy()
+    required = {"decision_timestamp_utc", "m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"}
+    missing = sorted(required - set(work.columns))
+    if missing:
+        raise ValueError("Missing availability columns: " + ", ".join(missing))
+    work["decision_timestamp_utc"] = _utc(work["decision_timestamp_utc"])
+    for column in ("m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"):
+        work[column] = _utc(work[column])
+    work = work.sort_values("decision_timestamp_utc").tail(max(1, int(validation_window_rows))).copy()
+    decision = work["decision_timestamp_utc"]
+    if now_utc is not None:
+        now = pd.Timestamp(now_utc)
+        now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
+        if (decision > now).any():
+            raise ValueError("Latest decision timestamp is in the future")
+    violations = 0
+    for column in ("m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"):
+        available = work[column]
+        violations += int((available.notna() & available.gt(decision)).sum())
+    if violations:
+        raise ValueError(f"Future feature availability violations in latest snapshot: {violations}")
     return violations
 
 

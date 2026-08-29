@@ -31,7 +31,7 @@ from src.inference.v06a_contract import (
     V05C_MODEL_ROOT,
     V05C_REGISTRY,
 )
-from src.learning.v05c_dataset import feature_contract_hash, validate_availability, validate_feature_registry
+from src.learning.v05c_dataset import feature_contract_hash, validate_availability, validate_feature_registry, validate_latest_snapshot_availability
 from src.learning.v05c_registry import file_sha256, load_registry, validate_registry
 
 
@@ -53,16 +53,20 @@ def latest_market_snapshot(frame: pd.DataFrame, now_utc: object) -> tuple[pd.Ser
     if frame.empty:
         raise RuntimeError("V0.5A feature store is empty")
     validate_feature_registry(REQUIRED_FEATURES)
-    validate_availability(frame)
-    missing = sorted({"decision_timestamp_utc", *REQUIRED_FEATURES} - set(frame.columns))
+    missing = sorted({"decision_timestamp_utc", *REQUIRED_FEATURES, "m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"} - set(frame.columns))
     if missing:
         raise RuntimeError("V0.5A feature store missing columns: " + ", ".join(missing))
     work = frame.copy()
     work["decision_timestamp_utc"] = pd.to_datetime(work["decision_timestamp_utc"], utc=True, errors="raise")
+    for column in ("m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"):
+        work[column] = pd.to_datetime(work[column], utc=True, errors="raise")
     work = work.sort_values("decision_timestamp_utc")
     row = work.iloc[-1]
     now = _utc(now_utc)
     decision = _utc(row["decision_timestamp_utc"])
+    if decision > now:
+        raise RuntimeError("Latest V0.5A decision timestamp is in the future")
+    validate_latest_snapshot_availability(work.tail(1), now_utc=now_utc)
     age_minutes = float((now - decision).total_seconds() / 60.0)
     if age_minutes < -0.05:
         raise RuntimeError("Latest V0.5A decision timestamp is in the future")
@@ -259,7 +263,8 @@ def run_shadow_cycle(now_utc: object | None = None, persist: bool = True) -> dic
         return payload
 
     try:
-        source = pd.read_parquet(FEATURE_SOURCE, engine="pyarrow")
+        source_columns = ["decision_timestamp_utc", *REQUIRED_FEATURES, "m1_available_from_utc", "m5_available_from_utc", "m15_available_from_utc", "h1_available_from_utc"]
+        source = pd.read_parquet(FEATURE_SOURCE, engine="pyarrow", columns=source_columns)
         feature_row, age = latest_market_snapshot(source, now)
     except Exception as exc:
         payload.update({"status": "FAIL_CLOSED", "reason": f"market data gate: {type(exc).__name__}: {exc}"})
