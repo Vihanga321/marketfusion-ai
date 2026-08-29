@@ -1,0 +1,34 @@
+MARKETFUSION V1.0A AUDITED MT5 HISTORICAL BACKFILL
+contract_version: v1.0a-audited-mt5-backfill-v1
+source_label: MT5_HISTORICAL_BACKFILL
+captured_at_utc: 2026-08-29T09:19:44.488811+00:00
+mode: READ_ONLY_AUDIT
+trading_execution: DISABLED
+
+TIMEFRAMES
+M1: requested=200000 fetched=200000 before=14650 candidate=200000 added=185350 first=2026-02-16T18:06:00+00:00 last=2026-08-29T00:00:00+00:00 conflicts=0
+M5: requested=100000 fetched=100000 before=8977 candidate=100000 added=91023 first=2025-04-25T09:35:00+00:00 last=2026-08-29T00:00:00+00:00 conflicts=0
+M15: requested=60000 fetched=60000 before=8217 candidate=60000 added=51783 first=2024-03-28T23:45:00+00:00 last=2026-08-29T00:00:00+00:00 conflicts=0
+H1: requested=30000 fetched=30000 before=6197 candidate=30000 added=23803 first=2021-11-02T06:00:00+00:00 last=2026-08-29T00:00:00+00:00 conflicts=0
+
+OVERLAP
+feature_dataset_overlap_rows: 8977
+feature_compared_non_null_values: 397007
+feature_mismatches: 0
+previous_nulls_filled_by_warmup: 36675
+
+MARKET_CORE
+eligible_rows: 30243
+eligible_trading_days: 111
+calendar_span_days: 193
+first_decision_utc: 2026-02-17T01:00:00+00:00
+last_decision_utc: 2026-08-28T20:00:00+00:00
+formal_v05c_history_requirement_trading_days: 90
+promotion_history_gate: MET
+
+blocking_failures: 0
+WARNING: M1 has 28 gaps larger than 3 bars (weekends/closures may explain them)
+WARNING: M5 has 83 gaps larger than 3 bars (weekends/closures may explain them)
+WARNING: M15 has 138 gaps larger than 3 bars (weekends/closures may explain them)
+WARNING: H1 has 260 gaps larger than 3 bars (weekends/closures may explain them)
+V10A_AUDIT_STATUS: PASS_AUDIT_READY_TO_APPLY

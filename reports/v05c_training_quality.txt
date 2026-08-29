@@ -1,6 +1,6 @@
 MARKETFUSION V0.5C CONTROLLED DAILY LEARNING
-created_at_utc: 2026-08-24T11:48:35.751265+00:00
-git_commit: 2ced956e0c16e823594f7d532c2f0de1fd08a75b
+created_at_utc: 2026-08-29T09:24:53.937645+00:00
+git_commit: bff11fca04493152ba957d48f0d900e320d04542
 trading: DISABLED / NOT IMPLEMENTED
 random_shuffle: NO
 ordinary_kfold: NO
@@ -12,51 +12,51 @@ candidate_families: LOGISTIC_REGRESSION, HIST_GRADIENT_BOOSTING, XGBOOST
 unavailable_families: NONE
 
 15m:
-training_rows: 8918
+training_rows: 31503
 folds: 5
 best_candidate: XGBOOST
-balanced_accuracy: 0.3398433206784944
-macro_f1: 0.3288690858993377
-log_loss: 0.8844334958962253
-brier: 0.5587452932136447
-coverage: 1.0
-COST_AWARE_RESEARCH_METRIC: -1.5805822502106342e-05
+balanced_accuracy: 0.35952252147170904
+macro_f1: 0.3364996432634276
+log_loss: 0.8673764332847683
+brier: 0.5512776603190154
+coverage: 0.9939055358049771
+COST_AWARE_RESEARCH_METRIC: -1.0413464752224256e-05
 stability: PASS
 calibration: SIGMOID_TEMPORAL_HOLDOUT
 promotion: NO_PROMOTION
-promotion_reason: failed gates: history_days, balanced_accuracy_margin, macro_f1_margin, log_loss_margin
+promotion_reason: failed gates: beats_existing_champion
 
 60m:
-training_rows: 8846
-folds: 5
-best_candidate: XGBOOST
-balanced_accuracy: 0.34904830286598093
-macro_f1: 0.34323230713007424
-log_loss: 0.8109889217474899
-brier: 0.5278158387146134
-coverage: 1.0
-COST_AWARE_RESEARCH_METRIC: 1.4962228830515422e-05
-stability: PASS
-calibration: SIGMOID_TEMPORAL_HOLDOUT
-promotion: NO_PROMOTION
-promotion_reason: failed gates: history_days, balanced_accuracy_margin, log_loss_margin
-
-240m:
-training_rows: 8558
+training_rows: 31251
 folds: 5
 best_candidate: HIST_GRADIENT_BOOSTING
-balanced_accuracy: 0.3296062911447527
-macro_f1: 0.327170384106695
-log_loss: 0.7789449925860763
-brier: 0.5333401038536958
-coverage: 1.0
-COST_AWARE_RESEARCH_METRIC: 1.8660575816545965e-05
+balanced_accuracy: 0.35616699419637216
+macro_f1: 0.3263230407419675
+log_loss: 0.8035394285176164
+brier: 0.5292794973891641
+coverage: 0.9981441187763983
+COST_AWARE_RESEARCH_METRIC: -7.291700459548726e-06
 stability: PASS
 calibration: SIGMOID_TEMPORAL_HOLDOUT
 promotion: NO_PROMOTION
-promotion_reason: failed gates: history_days, balanced_accuracy_margin, macro_f1_margin, log_loss_margin
+promotion_reason: failed gates: log_loss_margin
+
+240m:
+training_rows: 30243
+folds: 5
+best_candidate: XGBOOST
+balanced_accuracy: 0.35596406218685345
+macro_f1: 0.3270046063412306
+log_loss: 0.7516514910905857
+brier: 0.5139233054451956
+coverage: 1.0
+COST_AWARE_RESEARCH_METRIC: 3.7617524918484685e-05
+stability: PASS
+calibration: SIGMOID_TEMPORAL_HOLDOUT
+promotion: NO_PROMOTION
+promotion_reason: failed gates: log_loss_margin
 
 future_violations: 0
 outcome_feature_violations: 0
 purge_violations: 0
-V05C_STATUS: PASS_RESEARCH_ONLY
+V05C_STATUS: PASS_WITH_CHAMPION

@@ -1,7 +1,7 @@
 MARKETFUSION V0.8 VALIDATION
 
-commit: f28e9c8fa445a519943dcba63c3a4cbee8205654
-tested_at_utc: 2026-08-24T14:30:15.931967+00:00
+commit: bff11fca04493152ba957d48f0d900e320d04542
+tested_at_utc: 2026-08-29T11:26:19.748448+00:00
 
 SHADOW LEDGER
 predictions: 2
@@ -9,9 +9,9 @@ duplicate violations: 0
 mutation conflicts: 0
 
 OUTCOMES
-15m matured: 1
-60m matured: 0
-240m matured: 0
+15m matured: 2
+60m matured: 2
+240m matured: 2
 early-outcome violations: 0
 
 PERFORMANCE
@@ -21,7 +21,7 @@ PERFORMANCE
 
 WAIT
 wait rate: 1.0
-no-model waits: 1
+no-model waits: 6
 event waits: 0
 risk waits: 0
 
@@ -43,7 +43,7 @@ insufficient: 0
 CAUSAL
 future violations: 0
 outcome leaks: 0
-retroactive shadow predictions: 0
+retroactive shadow predictions: 1
 
 SECURITY
 trading execution: 0
@@ -51,4 +51,4 @@ account exposure: 0
 credential exposure: 0
 
 FINAL:
-PASS_MONITORING_NO_CHAMPION
+PASS_SHADOW_EVALUATION_DEGRADED_PROVIDERS

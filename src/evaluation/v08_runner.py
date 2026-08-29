@@ -174,18 +174,47 @@ def run_once(now_utc: object | None = None) -> dict[str, object]:
     return payload
 
 
+def _pid_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def _acquire_lock() -> None:
     MONITOR_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
     if MONITOR_LOCK_FILE.exists():
         try:
-            prior = int(MONITOR_LOCK_FILE.read_text().strip())
-            os.kill(prior, 0)
+            prior = int(MONITOR_LOCK_FILE.read_text(encoding="ascii").strip())
+        except (OSError, ValueError):
+            prior = -1
+        if _pid_running(prior):
             raise RuntimeError(f"V0.8 monitor already running as PID {prior}")
-        except ProcessLookupError:
-            MONITOR_LOCK_FILE.unlink()
-        except ValueError:
-            MONITOR_LOCK_FILE.unlink()
-    MONITOR_LOCK_FILE.write_text(str(os.getpid()), encoding="ascii")
+        MONITOR_LOCK_FILE.unlink(missing_ok=True)
+    try:
+        descriptor = os.open(MONITOR_LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError as exc:
+        raise RuntimeError("V0.8 monitor lock was acquired by another process") from exc
+    with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+        handle.write(str(os.getpid()))
+
+
+def _release_lock() -> None:
+    try:
+        if int(MONITOR_LOCK_FILE.read_text(encoding="ascii").strip()) == os.getpid():
+            MONITOR_LOCK_FILE.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
 
 
 def main() -> None:
@@ -205,8 +234,7 @@ def main() -> None:
     except KeyboardInterrupt:
         print("V0.8 monitor stopped cleanly.")
     finally:
-        if MONITOR_LOCK_FILE.exists() and MONITOR_LOCK_FILE.read_text().strip() == str(os.getpid()):
-            MONITOR_LOCK_FILE.unlink()
+        _release_lock()
 
 
 if __name__ == "__main__":

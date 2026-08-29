@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -17,6 +19,7 @@ from src.evaluation.v08_metrics import (
     grouped_performance, multiclass_log_loss, safe_rate, wait_analysis, wilson_interval,
 )
 from src.evaluation.v08_outcomes import matured_outcome_rows
+from src.evaluation.v08_runner import _acquire_lock, _pid_running, _release_lock
 from src.evaluation.v08_windows import evaluate_window
 
 DECISION = pd.Timestamp("2026-08-24T12:00:00Z")
@@ -104,6 +107,29 @@ class LedgerTests(unittest.TestCase):
     def test_forward_and_backtest_labels_are_distinct(self):
         self.assertEqual(build_prediction_record(state(), "2026-08-24T12:02:00Z", "test")["source_label"], SOURCE_LABEL)
         self.assertNotEqual(SOURCE_LABEL, "BACKTEST_RESEARCH")
+
+
+class MonitorLockTests(unittest.TestCase):
+    def test_nonexistent_pid_is_not_running(self):
+        self.assertFalse(_pid_running(2_147_483_647))
+
+    def test_stale_monitor_lock_is_replaced_and_released(self):
+        with tempfile.TemporaryDirectory() as temp:
+            lock = Path(temp) / "v08_monitor.lock"
+            lock.write_text("2147483647", encoding="ascii")
+            with patch("src.evaluation.v08_runner.MONITOR_LOCK_FILE", lock):
+                _acquire_lock()
+                self.assertEqual(lock.read_text(encoding="ascii"), str(os.getpid()))
+                _release_lock()
+                self.assertFalse(lock.exists())
+
+    def test_live_monitor_lock_rejects_duplicate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            lock = Path(temp) / "v08_monitor.lock"
+            lock.write_text(str(os.getpid()), encoding="ascii")
+            with patch("src.evaluation.v08_runner.MONITOR_LOCK_FILE", lock):
+                with self.assertRaisesRegex(RuntimeError, "already running"):
+                    _acquire_lock()
 
 
 class OutcomeTests(unittest.TestCase):

@@ -1,0 +1,10 @@
+MARKETFUSION V1.0A MARKET_CORE EXPANSION
+eligibility_rule: feature_complete == True AND 15m/60m/240m outcomes matured
+eligible_rows: 30243
+eligible_trading_days: 111
+calendar_span_days: 193
+first_decision_utc: 2026-02-17T01:00:00+00:00
+last_decision_utc: 2026-08-28T20:00:00+00:00
+v05c_promotion_history_requirement_trading_days: 90
+promotion_history_gate: MET
+note: calendar span is reported separately and does not substitute for V0.5C eligible decision-day count.

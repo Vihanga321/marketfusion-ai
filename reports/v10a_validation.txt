@@ -1,0 +1,17 @@
+MARKETFUSION V1.0A VALIDATION
+commit: bff11fca04493152ba957d48f0d900e320d04542
+tested_at_utc: 2026-08-29T09:19:50.617496+00:00
+mode: APPLY
+timeframes: M1,M5,M15,H1
+bar_overlap_conflicts: 0
+dataset_overlap_mismatches: 0
+blocking_failures: 0
+eligible_rows: 30243
+eligible_trading_days: 111
+calendar_span_days: 193
+promotion_history_gate: MET
+future_feature_violations: 0
+outcome_timing_violations: 0
+trading_execution: DISABLED
+automatic_promotion: FORBIDDEN
+V10A_STATUS: PASS_APPLIED_HISTORY_GATE_MET

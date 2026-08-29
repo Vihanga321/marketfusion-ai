@@ -1,0 +1,10 @@
+MARKETFUSION V1.0A APPLY REPORT
+mode: APPLY
+applied: TRUE
+backup_path: C:\Users\vihan\marketfusion-ai\data\backfill\v10a\backups\20260829T091944Z
+eligible_trading_days: 111
+promotion_history_gate: MET
+automatic_v05c_training: NO
+automatic_model_promotion: NO
+live_advisory_changed: NO
+V10A_STATUS: PASS_APPLIED_HISTORY_GATE_MET

@@ -6,7 +6,7 @@ predictive_edge_claim: NO
 commission_status: UNKNOWN
 
 recorded_predictions: 2
-matured_outcome_rows: 1
+matured_outcome_rows: 6
 wait_rate: 1.0
 directional_calls: 0
 
@@ -16,18 +16,19 @@ significance: INSUFFICIENT_DATA
 intelligence_context: descriptive V0.5B health grouping only; activity categories unavailable unless captured causally in V0.6
 
 15m:
-matured: 1
+matured: 2
 directional_accuracy: INSUFFICIENT_DATA
 brier: NO_APPROVED_MODEL_DATA
 status: INSUFFICIENT_DATA
+
 60m:
-matured: 0
+matured: 2
 directional_accuracy: INSUFFICIENT_DATA
 brier: NO_APPROVED_MODEL_DATA
 status: INSUFFICIENT_DATA
 
 240m:
-matured: 0
+matured: 2
 directional_accuracy: INSUFFICIENT_DATA
 brier: NO_APPROVED_MODEL_DATA
 status: INSUFFICIENT_DATA

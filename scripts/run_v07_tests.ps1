@@ -4,7 +4,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Python = Join-Path $Root 'venv\Scripts\python.exe'
 Push-Location $Root
 try {
-    & $Python -m unittest tests.test_v07_dashboard_api -v
+    & $Python -m unittest tests.test_v07_dashboard_api tests.test_v07_operator -v
     if ($LASTEXITCODE -ne 0) { throw 'V0.7 API tests failed' }
     Push-Location dashboard
     try {

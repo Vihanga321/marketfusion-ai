@@ -1,7 +1,7 @@
 MARKETFUSION V0.5C FEATURE GROUP ELIGIBILITY
 activation thresholds are defined in src/learning/v05c_contract.py
 group|eligible|rows|days/history coverage|reason
-MARKET_CORE|TRUE|8558|39|requires >= 2000 matured rows and >= 20 calendar days
-INTELLIGENCE_V05B|FALSE|4|1|INSUFFICIENT_HISTORY until >= 2000 causal joined rows, >= 90 days, and chronological validation
+MARKET_CORE|TRUE|30243|111|requires feature_complete plus all horizons matured, >= 2000 rows and >= 20 eligible decision days
+INTELLIGENCE_V05B|FALSE|9|1|INSUFFICIENT_HISTORY until >= 2000 causal joined rows, >= 90 days, and chronological validation
 EVENT_MEMORY|FALSE|0|0|RESEARCH_ONLY_DISABLED: no independently audited V0.5C join contract
 LIVE_SURPRISE|FALSE|0|0|INSUFFICIENT_HISTORY until >= 100 verified live surprise samples

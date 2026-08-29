@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from src.dashboard.v07_api import app, load_state, trading_route_count
+from src.dashboard.v07_contract import DASHBOARD_PORT, VITE_ORIGINS
 from src.dashboard.v07_market import load_candles
 
 
@@ -120,6 +121,28 @@ class V07DashboardApiTests(unittest.TestCase):
         self.assertFalse(payload["trading_enabled"])
         self.assertTrue(payload["manual_execution_only"])
         self.assertIn(payload["status"], {"INSUFFICIENT_DATA", "PASS_MONITORING_NO_CHAMPION", "PASS_SHADOW_EVALUATION", "PASS_SHADOW_EVALUATION_DEGRADED_PROVIDERS"})
+
+    def test_19_dashboard_port_and_cors_use_safe_local_default(self):
+        self.assertEqual(DASHBOARD_PORT, 4173)
+        self.assertEqual(VITE_ORIGINS, ("http://127.0.0.1:4173", "http://localhost:4173"))
+        response = self.client.get("/api/health", headers={"Origin": "http://127.0.0.1:4173"})
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "http://127.0.0.1:4173")
+
+    def test_20_old_dashboard_origin_is_not_allowed(self):
+        response = self.client.get("/api/health", headers={"Origin": "http://127.0.0.1:5173"})
+        self.assertNotIn("access-control-allow-origin", response.headers)
+
+    def test_21_operator_status_is_read_only_and_separates_health(self):
+        temp, path = self._state_file(valid_state())
+        with temp, TemporaryDirectory() as data_dir, \
+                patch("src.dashboard.v07_api.V06_STATE_FILE", path), \
+                patch("src.dashboard.v07_api.V05A_STATUS_FILE", Path(data_dir) / "missing.json"):
+            payload = self.client.get("/api/operator/status").json()
+            self.assertEqual(payload["contract_version"], "v0.7-operator-status-v1")
+            self.assertFalse(payload["trading_window"]["trading_enabled"])
+            self.assertEqual(payload["trading_window"]["execution"], "DISABLED")
+            self.assertIn(payload["system_health"]["status"], {"PASS", "DEGRADED", "FAIL"})
+            self.assertIn(payload["trading_state"], {"WAIT", "BLOCKED", "MARKET_CLOSED"})
 
 
 if __name__ == "__main__":

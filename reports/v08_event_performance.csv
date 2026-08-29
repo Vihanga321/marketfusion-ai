@@ -1,2 +1,4 @@
 event_risk,horizon_minutes,sample_count,wait_rate,directional_coverage,directional_accuracy,brier,cost_aware_research_metric,status
-NONE,15,1,1.0,0.0,,,,INSUFFICIENT_SAMPLE
+NONE,15,2,1.0,0.0,,,,INSUFFICIENT_SAMPLE
+NONE,60,2,1.0,0.0,,,,INSUFFICIENT_SAMPLE
+NONE,240,2,1.0,0.0,,,,INSUFFICIENT_SAMPLE

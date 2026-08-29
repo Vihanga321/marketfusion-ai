@@ -19,9 +19,11 @@ The V0.7 React dashboard is a localhost-only, read-only view of the canonical V0
 .\scripts\stop_marketfusion.ps1
 ```
 
-Open: `http://127.0.0.1:5173`
+Open: `http://127.0.0.1:4173`
 
-The current fail-closed state is intentionally presented as WAIT / VERY LOW with no approved models and no trade window. See [the V0.7 dashboard contract](docs/V07_DASHBOARD.md) for endpoints, polling, and safety behavior.
+Port 4173 is the safe local default. To override it consistently for the launcher, Vite, and API CORS, pass `-DashboardPort <port>` to the full or dashboard launcher. Direct Vite launches can use `MARKETFUSION_DASHBOARD_PORT`.
+
+Valid fail-closed states are intentionally presented as WAIT with their actual confidence, gate, approved-horizon count, data freshness, and advisory-window reason. See [the V0.7 dashboard contract](docs/V07_DASHBOARD.md) for endpoints, polling, and safety behavior.
 
 ## V0.8 forward shadow monitoring
 

@@ -31,6 +31,7 @@ export interface HorizonPrediction {
   top_probability?: number;
   shadow_direction?: string;
   decision_gate?: string;
+  probability_confidence_band?: Confidence;
 }
 export interface FusionProbability { down: number; neutral: number; up: number }
 export interface FusionState {
@@ -131,4 +132,56 @@ export interface V08Status {
   research: { status: string; experiments: number; best_experiment: string | null; decision: string };
   manual_execution_only: true;
   trading_enabled: false;
+}
+export interface OperatorStatus {
+  contract_version: string;
+  current_time: DualTime;
+  market: {
+    status: "OPEN" | "CLOSED_WEEKEND" | "OPENING_SOON" | "CLOSING_SOON" | "UNKNOWN";
+    market_open: boolean;
+    reason: string;
+    next_market_open_utc: string | null;
+    next_market_close_utc: string | null;
+  };
+  session: {
+    current_session: string;
+    active_sessions: string[];
+    overlap: boolean;
+    next_session: string | null;
+    next_session_change_utc: string | null;
+    next_transition: string;
+  };
+  data_freshness: {
+    status: "LIVE" | "FRESH" | "DELAYED" | "STALE" | "UNAVAILABLE";
+    reason: string;
+    basis: string;
+    latest_market_tick_utc: string | null;
+    latest_completed_m5_utc: string | null;
+    latest_completed_m15_utc: string | null;
+    feature_row_utc: string | null;
+    market_age_seconds: number | null;
+    tick_age_seconds: number | null;
+    m5_age_seconds: number | null;
+    m15_age_seconds: number | null;
+    feature_age_seconds: number | null;
+    market_closed_context: boolean;
+  };
+  reassessment: { status: string; at_utc: string | null; reason: string };
+  trading_window: {
+    status: string;
+    reason: string;
+    trading_state: "READY" | "WAIT" | "BLOCKED" | "MARKET_CLOSED";
+    start_utc: string | null;
+    end_utc: string | null;
+    horizon_minutes?: number | null;
+    execution: "DISABLED";
+    trading_enabled: false;
+    manual_confirmation_required: true;
+  };
+  system_health: { status: "PASS" | "DEGRADED" | "FAIL"; reason: string };
+  trading_state: "READY" | "WAIT" | "BLOCKED" | "MARKET_CLOSED";
+  wait_explanation: string;
+  runtime_gate?: string | null;
+  runtime_status?: string | null;
+  mode: string;
 }

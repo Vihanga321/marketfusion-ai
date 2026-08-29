@@ -19,6 +19,7 @@ from src.dashboard.v07_contract import (
     V08_STATUS_FILE, VITE_ORIGINS,
 )
 from src.dashboard.v07_market import load_candles
+from src.dashboard.v07_operator import build_operator_status, latest_quote_timestamp
 
 
 def _utc(value: object) -> pd.Timestamp:
@@ -155,6 +156,16 @@ def market_summary() -> dict[str, object]:
         "mid": None if payload.get("latest_bid") is None or payload.get("latest_ask") is None else (float(payload["latest_bid"]) + float(payload["latest_ask"])) / 2,
         "spread_points": payload.get("latest_spread_points"),
     }
+
+
+@app.get("/api/operator/status")
+def operator_status() -> dict[str, object]:
+    payload, freshness, detail = load_state()
+    v05a = _safe_json(V05A_STATUS_FILE)
+    return build_operator_status(
+        payload, v05a, quote_timestamp=latest_quote_timestamp(v05a),
+        state_valid=detail == "PASS", state_freshness=freshness,
+    )
 
 
 @app.get("/api/runtime/history")

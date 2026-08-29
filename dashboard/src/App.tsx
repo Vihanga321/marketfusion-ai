@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, BrainCircuit, CalendarClock, Clock3, Database, Radio, ShieldCheck, WifiOff } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BrainCircuit, CalendarClock, Database, Radio, ShieldCheck, WifiOff } from "lucide-react";
 import { CandleChart } from "./components/CandleChart";
+import { OperatorPanels } from "./components/OperatorPanels";
 import { Metric, Panel, StatusDot } from "./components/Panel";
 import { PredictionCard } from "./components/PredictionCard";
 import { useCandles } from "./hooks/useCandles";
@@ -15,14 +16,14 @@ export default function App() {
   const { state, connection, lastSuccess } = useMarketFusionState();
   const [timeframe, setTimeframe] = useState<Timeframe>("M5");
   const { candles, status: candleStatus } = useCandles(timeframe);
-  const { market: quote, intelligence, research, events, monitoring } = useSupplementary();
+  const { market: quote, intelligence, research, events, monitoring, operator } = useSupplementary();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
   const safe = connection === "LIVE";
   const action: AdvisoryAction = safe && state ? state.decision.action : "WAIT";
   const confidence = safe && state ? state.decision.confidence : "VERY_LOW";
-  const reason = state?.reasons[0]?.message ?? "Live runtime state is unavailable.";
+  const reason = safe ? operator?.wait_explanation ?? state?.reasons[0]?.message ?? "No backend decision reason is available." : "Live runtime state is unavailable; advisory remains fail-closed.";
   const horizons = state?.predictions.horizons ?? {};
   const fusion = state?.predictions.fusion;
   const approved = fusion?.valid_horizons?.length ?? 0;
@@ -33,23 +34,25 @@ export default function App() {
     (!!item.event_code && item.event_code === event?.nearest_event?.event_code)
   );
   const verifiedForecast = auditedEvent?.consensus_status === "VERIFIED_PRE_RELEASE_CONSENSUS" ? auditedEvent.forecast_value : null;
-  const nextReview = state?.decision.next_reassessment.utc;
   const risk = state?.reasons.some(item => item.blocking) ? "BLOCKING" : state?.reasons.length ? "CAUTION" : "NORMAL";
   const healthEntries = Object.entries(state?.health.sources ?? {});
-  const session = state?.market.session === "OVERLAP" ? "LONDON + NY" : label(state?.market.session);
   const agreement = approved === 0 ? "NO APPROVED MODELS" : fusion?.status ?? "PARTIAL";
   const currentLocal = useMemo(() => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(now)), [now]);
+  const marketBadge = operator?.market.status === "OPEN" ? "OPEN" : operator?.market.status === "CLOSED_WEEKEND" ? "CLOSED" : label(operator?.market.status);
+  const dataBadge = operator?.data_freshness.status ?? "UNAVAILABLE";
 
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><BrainCircuit size={23} /></div><div><h1>MARKETFUSION <span>AI</span></h1><p>Real-Time EUR/USD Research Intelligence</p></div></div>
       <div className="top-health">
         <StatusDot label="MT5" value={quote?.status?.startsWith("PASS") ? "CONNECTED" : "UNAVAILABLE"} />
-        <StatusDot label="V0.5A" value={state?.market.freshness?.status ?? "UNAVAILABLE"} />
-        <StatusDot label="V0.5B" value={state?.intelligence?.status ?? "UNAVAILABLE"} />
-        <StatusDot label="V0.5C" value={approved ? `${approved}/3 APPROVED` : "NO CHAMPION"} />
-        <StatusDot label="V0.6" value={state?.decision.action ?? "UNAVAILABLE"} />
-        <StatusDot label="Trading" value="DISABLED" tone="warn" />
+        <StatusDot label="API HEALTH" value={operator?.system_health.status ?? (connection === "LIVE" ? "PASS" : "DEGRADED")} />
+        <StatusDot label="MARKET" value={marketBadge} tone={operator?.market.market_open ? "good" : "warn"} />
+        <StatusDot label="DATA" value={dataBadge} tone={dataBadge === "LIVE" || dataBadge === "FRESH" ? "good" : "warn"} />
+        <StatusDot label="MODE" value="SHADOW" tone="info" />
+        <StatusDot label="MODELS" value={`${approved}/3`} tone={approved === 3 ? "good" : "warn"} />
+        <StatusDot label="ADVISORY" value={action} tone="warn" />
+        <StatusDot label="EXECUTION" value="DISABLED" tone="warn" />
       </div>
       <div className="mode-block"><b>SHADOW / MANUAL MODE</b><span>{currentLocal} LKT</span><small>{utcTime(state?.system.generated_time.utc)}</small></div>
     </header>
@@ -64,37 +67,25 @@ export default function App() {
       </Panel>
 
       <Panel title="Current Advisory" eyebrow="V0.6C DECISION" className={`decision-panel decision-${action.toLowerCase()}`}>
-        <div className="advisory"><span>{connection === "LIVE" ? "CURRENT ADVISORY" : "SAFETY ADVISORY"}</span><strong>{action.replace("_", " ")}</strong><p>{action === "WAIT" ? "System is collecting live market intelligence. No V0.5C model has yet passed promotion requirements." : state?.decision.action_meaning}</p></div>
-        <div className="decision-metrics"><Metric label="CONFIDENCE" value={confidence.replace("_", " ")} tone="warn" /><Metric label="RISK" value={risk} tone={risk === "NORMAL" ? "good" : "warn"} /><Metric label="MANUAL EXECUTION" value="YES" /><Metric label="TRADING EXECUTION" value="DISABLED" tone="warn" /></div>
+        <div className="advisory"><span>{connection === "LIVE" ? "CURRENT ADVISORY" : "SAFETY ADVISORY"}</span><strong>{action.replace("_", " ")}</strong><p>{state?.decision.action_meaning ?? "Directional advice is unavailable; the system remains fail-closed."}</p></div>
+        <div className="decision-metrics"><Metric label="MODEL DECISION" value={label(fusion?.direction ?? state?.decision.direction)} /><Metric label="CONFIDENCE" value={confidence.replace("_", " ")} tone="warn" /><Metric label="RISK GATE" value={label(state?.decision.gate)} tone="warn" /><Metric label="MARKET STATE" value={`${marketBadge} / ${dataBadge}`} tone={operator?.market.market_open ? "muted" : "warn"} /><Metric label="RISK" value={risk} tone={risk === "NORMAL" ? "good" : "warn"} /><Metric label="EXECUTION" value="DISABLED · MANUAL REQUIRED" tone="warn" /></div>
         <div className="primary-reason"><AlertTriangle size={18} /><div><span>PRIMARY REASON</span><b>{reason}</b></div></div>
       </Panel>
     </div>
 
+    <OperatorPanels operator={operator} now={now} connected={safe} />
+
     <div className="model-grid">
-      <PredictionCard label="15 MIN" prediction={horizons["15"]} />
-      <PredictionCard label="1 HOUR" prediction={horizons["60"]} />
-      <PredictionCard label="4 HOURS" prediction={horizons["240"]} />
+      <PredictionCard label="15 MIN" prediction={horizons["15"]} predictionTime={state?.decision.decision_time.utc} featureTime={operator?.data_freshness.feature_row_utc} now={now} />
+      <PredictionCard label="1 HOUR" prediction={horizons["60"]} predictionTime={state?.decision.decision_time.utc} featureTime={operator?.data_freshness.feature_row_utc} now={now} />
+      <PredictionCard label="4 HOURS" prediction={horizons["240"]} predictionTime={state?.decision.decision_time.utc} featureTime={operator?.data_freshness.feature_row_utc} now={now} />
     </div>
 
-    <div className="secondary-grid">
+    <div className="fusion-strip">
       <Panel title="Fusion State" eyebrow="WEIGHTED HORIZON CONSENSUS">
         <div className="fusion-heading"><span>Horizon agreement</span><b>{label(agreement)}</b><small>{approved}/3 approved horizons</small></div>
         <div className="fusion-probs"><Metric label="DOWN" value={probability(fusion?.probabilities?.down)} tone="down" /><Metric label="NEUTRAL" value={probability(fusion?.probabilities?.neutral)} /><Metric label="UP" value={probability(fusion?.probabilities?.up)} tone="good" /></div>
         <div className="inline-detail"><span>Directional margin</span><b>{probability(fusion?.margin)}</b><span>Fusion action</span><b className="tone-warn">{action.replace("_", " ")}</b></div>
-      </Panel>
-
-      <Panel title="Manual Trade Window" eyebrow="OBSERVATION WINDOW ONLY">
-        <div className="window-status"><ShieldCheck size={20} /><div><span>STATUS</span><b>{state?.decision.gate ?? "WAIT_SYSTEM_DATA_INVALID"}</b></div></div>
-        <div className="window-grid"><Metric label="SUGGESTED START" value={safe ? localTime(state?.trade_window.start_utc) : dash} sub={safe ? utcTime(state?.trade_window.start_utc) : undefined} /><Metric label="SUGGESTED END" value={safe ? localTime(state?.trade_window.end_utc) : dash} sub={safe ? utcTime(state?.trade_window.end_utc) : undefined} /><Metric label="HORIZON" value={state?.trade_window.horizon_minutes ? `${state.trade_window.horizon_minutes} min` : dash} /></div>
-        <p className="muted-copy">{state?.trade_window.status === "ADVISORY_WINDOW" && safe ? "Manual confirmation in MT5 remains mandatory." : "No manual trade window is available. No approved model."}</p>
-      </Panel>
-
-      <Panel title="Next System Review" eyebrow="CLIENT-SIDE COUNTDOWN" className="countdown-panel">
-        <Clock3 size={24} /><strong>{countdown(nextReview, now)}</strong><span>{localTime(nextReview)} LKT</span><small>{utcTime(nextReview)}</small><p>Next completed M5 decision</p>
-      </Panel>
-
-      <Panel title="Current Market Context" eyebrow="CAUSAL V0.5A SNAPSHOT">
-        <div className="metric-grid compact"><Metric label="SESSION" value={session} /><Metric label="TREND" value={label(state?.market.regime?.trend_regime)} /><Metric label="VOLATILITY" value={label(state?.market.regime?.volatility_regime)} /><Metric label="SPREAD" value={label(state?.market.spread?.status)} /><Metric label="DATA AGE" value={state?.market.freshness?.age_minutes == null ? dash : `${state.market.freshness.age_minutes.toFixed(1)} min`} /><Metric label="M5 DECISION" value={localTime(state?.decision.decision_time.utc)} /></div>
       </Panel>
     </div>
 
@@ -122,9 +113,9 @@ export default function App() {
       </Panel>
 
       <Panel title="System Health" eyebrow="LOCAL RUNTIME PIPELINE">
-        <div className="health-list">{healthEntries.map(([name,value]) => <StatusDot key={name} label={name.replace("_", " ").toUpperCase()} value={value} />)}</div>
-        <div className="provider-row"><StatusDot label="V06C RUNTIME" value={state?.system.status ?? "UNAVAILABLE"} /></div>
-        <div className="health-times"><span>Last market update</span><b>{localTime(state?.market.freshness?.observed_at_utc, true)}</b><span>Last intelligence update</span><b>{localTime(intelligence?.captured_at_utc, true)}</b><span>Last model training</span><b>{localTime(research?.last_training_utc, true)}</b><span>Last runtime state</span><b>{localTime(state?.system.generated_time.utc, true)}</b></div>
+        <div className="provider-row"><StatusDot label="SYSTEM HEALTH" value={operator?.system_health.status ?? "UNAVAILABLE"} /><StatusDot label="TRADING STATE" value={safe ? operator?.trading_state ?? "UNAVAILABLE" : "BLOCKED"} tone="warn" /><StatusDot label="V06C GATE" value={safe ? state?.decision.gate ?? "UNAVAILABLE" : "WAIT SYSTEM DATA INVALID"} tone="warn" /></div>
+        <div className="health-list">{healthEntries.map(([name,value]) => <StatusDot key={name} label={name.replace("_", " ").toUpperCase()} value={value} tone={name === "v05a_market" && !operator?.market.market_open && value === "FAIL" ? "warn" : undefined} />)}</div>
+        <div className="health-times"><span>Latest market tick</span><b>{localTime(operator?.data_freshness.latest_market_tick_utc, true)}</b><span>Latest feature row</span><b>{localTime(operator?.data_freshness.feature_row_utc, true)}</b><span>Last intelligence update</span><b>{localTime(intelligence?.captured_at_utc, true)}</b><span>Last model training</span><b>{localTime(research?.last_training_utc, true)}</b><span>Last runtime state</span><b>{localTime(state?.system.generated_time.utc, true)}</b></div>
       </Panel>
     </div>
 
