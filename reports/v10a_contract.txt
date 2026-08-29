@@ -1,0 +1,23 @@
+MARKETFUSION V1.0A AUDITED MT5 BACKFILL CONTRACT
+contract_version: v1.0a-audited-mt5-backfill-v1
+symbol: EURUSD
+mode: HISTORICAL_RESEARCH_BACKFILL
+source_label: MT5_HISTORICAL_BACKFILL
+true_forward_shadow_label: FORBIDDEN_FOR_BACKFILL
+timeframes: M1,M5,M15,H1
+M1_request_ceiling: 200000
+M5_request_ceiling: 100000
+M15_request_ceiling: 60000
+H1_request_ceiling: 30000
+bar_admission: completed bars only
+overlap_policy: all existing immutable OHLC/volume/spread values must match
+feature_builder: existing V0.5A causal feature builder
+outcome_builder: exact V0.5A 15m/60m/240m M5 outcomes; no interpolation
+market_core_training_rule: fully-featured rows only
+promotion_history_gate: imported from V0.5C; not weakened
+automatic_training: NO
+automatic_promotion: NO
+trading_execution: DISABLED
+apply_policy: explicit --apply only after audit; timestamped backup; atomic writes; rollback on failure
+profitability_claim: FORBIDDEN
+predictive_edge_claim: FORBIDDEN

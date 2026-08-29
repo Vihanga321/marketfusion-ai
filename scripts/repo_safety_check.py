@@ -12,7 +12,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 TEXT_SUFFIXES = {
     ".py", ".java", ".xml", ".md", ".txt", ".json", ".yml", ".yaml",
@@ -44,7 +43,7 @@ REQUIRED_GITIGNORE_LINES = {
     "data/dukascopy/", "data/provider_audit/", "data/mt5/ticks/",
     "data/mt5/history/", "data/mt5/calendar/", "data/mt5/continuous/",
     "data/intelligence/", "data/inference/", "data/runtime/", "data/evaluation/",
-    "data/research/", "models/v05c/", "*.pid", "*.lock",
+    "data/research/", "data/backfill/", "models/v05c/", "*.pid", "*.lock",
     "jforex-event-exporter/target/",
 }
 

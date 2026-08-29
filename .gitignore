@@ -18,6 +18,7 @@ data/inference/
 data/runtime/
 data/evaluation/
 data/research/
+data/backfill/
 *.pid
 *.lock
 data/processed/*.parquet
