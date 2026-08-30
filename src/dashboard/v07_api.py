@@ -22,6 +22,7 @@ from src.dashboard.v07_market import load_candles
 from src.dashboard.v07_operator import build_operator_status, latest_quote_timestamp
 from src.evaluation.v08_contract import MAX_OBSERVATION_API_LIMIT
 from src.evaluation.v08_observations import json_records, observations_frame, shadow_summary
+from src.engines.engine_layer import engine_status
 
 
 def _utc(value: object) -> pd.Timestamp:
@@ -220,6 +221,11 @@ def intelligence() -> dict[str, object]:
         "FRED": "DEGRADED" if any("us_" in str(item) for item in payload.get("macro_errors") or []) else "OK",
     }
     return {"status": payload.get("status", "UNAVAILABLE"), "captured_at_utc": payload.get("captured_at_utc"), "news_counts": news_counts, "topic_counts_24h": topics, "macro": {key: payload.get(key) for key in macro_fields}, "provider_health": provider_health}
+
+
+@app.get("/api/engines/status")
+def engines_status() -> dict[str, object]:
+    return engine_status()
 
 
 @app.get("/api/research")

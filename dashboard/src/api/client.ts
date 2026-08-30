@@ -1,4 +1,4 @@
-import type { CandleResponse, EventsResponse, IntelligenceDetail, MarketFusionState, MarketSummary, OperatorStatus, ResearchState, ShadowRecent, ShadowSummary, Timeframe, V08Status } from "../types/marketfusion";
+import type { CandleResponse, EngineStatus, EventsResponse, IntelligenceDetail, MarketFusionState, MarketSummary, OperatorStatus, ResearchState, ShadowRecent, ShadowSummary, Timeframe, V08Status } from "../types/marketfusion";
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<{ data: T; response: Response }> {
   const response = await fetch(path, { signal, headers: { Accept: "application/json" }, cache: "no-store" });
@@ -16,3 +16,4 @@ export const fetchEvents = (signal?: AbortSignal) => getJson<EventsResponse>("/a
 export const fetchV08Status = (signal?: AbortSignal) => getJson<V08Status>("/api/v08/status", signal);
 export const fetchShadowSummary = (signal?: AbortSignal) => getJson<ShadowSummary>("/api/evaluation/shadow/summary", signal);
 export const fetchShadowRecent = (signal?: AbortSignal) => getJson<ShadowRecent>("/api/evaluation/shadow/recent?limit=20", signal);
+export const fetchEngineStatus = (signal?: AbortSignal) => getJson<EngineStatus>("/api/engines/status", signal);

@@ -233,3 +233,5 @@ export interface OperatorStatus {
   runtime_status?: string | null;
   mode: string;
 }
+export interface EngineOutput { engine_name: string; status: string; direction_score: number | null; confidence: number | null; regime: string | null; feature_count: number; input_freshness: string; reason_codes: string[]; components: Record<string, number | string | null> }
+export interface EngineStatus { contract_version: string; status: string; decision_timestamp_utc: string | null; engines: Record<string, EngineOutput>; external_engines: Record<string, EngineOutput>; observational_only: boolean; v06_integration: boolean }

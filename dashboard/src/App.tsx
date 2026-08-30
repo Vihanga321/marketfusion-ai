@@ -17,7 +17,7 @@ export default function App() {
   const { state, connection, lastSuccess } = useMarketFusionState();
   const [timeframe, setTimeframe] = useState<Timeframe>("M5");
   const { candles, status: candleStatus } = useCandles(timeframe);
-  const { market: quote, intelligence, research, events, monitoring, operator, shadowSummary, shadowRecent } = useSupplementary();
+  const { market: quote, intelligence, research, events, monitoring, operator, shadowSummary, shadowRecent, engines } = useSupplementary();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
@@ -75,6 +75,17 @@ export default function App() {
     </div>
 
     <OperatorPanels operator={operator} now={now} connected={safe} />
+
+    <Panel title="Engine Intelligence" eyebrow="V0.9A OBSERVATIONAL ANALYSIS">
+      <div className="engine-grid">{Object.values(engines?.engines ?? {}).map(engine => <article className="engine-card" key={engine.engine_name}>
+        <div className="engine-card-head"><span>{engine.engine_name.replaceAll("_", " ")}</span><StatusDot label="STATUS" value={engine.status} /></div>
+        <strong className={engine.direction_score == null ? "tone-muted" : engine.direction_score > 0.1 ? "tone-good" : engine.direction_score < -0.1 ? "tone-down" : "tone-muted"}>{engine.direction_score == null ? "UNAVAILABLE" : `${engine.direction_score >= 0 ? "+" : ""}${engine.direction_score.toFixed(2)}`}</strong>
+        <div className="engine-meta"><span>{engine.regime ?? "NO REGIME"}</span><span>{engine.confidence == null ? "--" : `${Math.round(engine.confidence * 100)}% confidence`}</span></div>
+        <small>{engine.reason_codes.join(" · ") || "No causal reason available"}</small>
+      </article>)}</div>
+      <div className="engine-external">{Object.values(engines?.external_engines ?? {}).map(engine => <StatusDot key={engine.engine_name} label={engine.engine_name} value={engine.status} />)}</div>
+      <p className="muted-copy">Engine scores are analytical research signals only. V0.6 risk fusion and V0.8 shadow recording are unchanged.</p>
+    </Panel>
 
     <div className="model-grid">
       <PredictionCard label="15 MIN" prediction={horizons["15"]} predictionTime={state?.decision.decision_time.utc} featureTime={operator?.data_freshness.feature_row_utc} now={now} />
