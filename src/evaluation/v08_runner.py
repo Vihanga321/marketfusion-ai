@@ -14,14 +14,15 @@ import pandas as pd
 from src.evaluation.v08_analysis import generate_analysis
 from src.evaluation.v08_contract import (
     CONFLICT_DIR, DEFAULT_MONITOR_SECONDS, FINAL_STATUSES, HORIZONS, LATEST_STATUS_FILE,
-    MONITOR_LOCK_FILE, OUTCOMES_FILE, PREDICTIONS_FILE, PROVIDER_REPORT,
+    LIVE_SHADOW_REPORT, MONITOR_LOCK_FILE, OUTCOMES_FILE, PREDICTIONS_FILE, PROVIDER_REPORT,
     PROVIDER_UPTIME_FILE, SCORECARD_REPORT, VALIDATION_REPORT, WINDOW_OUTCOMES_FILE,
 )
-from src.evaluation.v08_ledger import ingest_state
+from src.evaluation.v08_ledger import ingest_state, recording_eligibility
+from src.evaluation.v08_observations import shadow_summary
 from src.evaluation.v08_outcomes import attach_matured_outcomes
 from src.evaluation.v08_windows import evaluate_window
 from src.intelligence.v05b_contract import STATUS_FILE as V05B_STATUS_FILE
-from src.marketdata.v05a_contract import CONTINUOUS_DIR, TIMEFRAMES
+from src.marketdata.v05a_contract import CONTINUOUS_DIR, STATUS_FILE as V05A_STATUS_FILE, TIMEFRAMES
 from src.runtime.v06c_contract import LATEST_STATE_FILE
 
 
@@ -139,34 +140,79 @@ def _validation(status: dict[str, Any], conflicts: int) -> None:
     VALIDATION_REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
+def _live_shadow_report(summary: dict[str, Any], ledger_cycle: dict[str, object]) -> None:
+    lines = [
+        "MARKETFUSION V0.8 LIVE SHADOW VALIDATION", "",
+        f"generated_at_utc: {summary['generated_at_utc']}",
+        f"recorder_status: {summary['recorder']['status']}",
+        f"trigger: {summary['recorder']['trigger']}",
+        f"last_cycle_status: {ledger_cycle.get('status', 'NOT_RUN')}",
+        f"last_cycle_reason: {ledger_cycle.get('reason') or ledger_cycle.get('detail') or 'NOT_AVAILABLE'}", "",
+        f"total_observations: {summary['total_observations']}",
+        f"performance_observations: {summary['performance_observations']}",
+        f"pending: {summary['counts']['PENDING']}",
+        f"pending_data: {summary['counts']['PENDING_DATA']}",
+        f"evaluated: {summary['counts']['EVALUATED']}",
+        f"invalid: {summary['counts']['INVALID']}", "",
+    ]
+    for horizon in HORIZONS:
+        item = summary["horizons"][str(horizon)]
+        lines.extend([
+            f"{horizon}m:", f"sample_count: {item['sample_count']}",
+            f"sample_status: {item['sample_status']}",
+            f"accuracy: {item['accuracy'] if item['accuracy'] is not None else 'INSUFFICIENT_SAMPLE'}",
+            f"macro_f1: {item['macro_f1'] if item['macro_f1'] is not None else 'INSUFFICIENT_SAMPLE'}",
+            f"brier: {item['mean_brier_score'] if item['mean_brier_score'] is not None else 'INSUFFICIENT_SAMPLE'}", "",
+        ])
+    lines.append("trading_execution: DISABLED")
+    LIVE_SHADOW_REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
 def run_once(now_utc: object | None = None) -> dict[str, object]:
     now = pd.Timestamp.now(tz="UTC") if now_utc is None else pd.Timestamp(now_utc)
     now = now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
     state = _json(LATEST_STATE_FILE)
+    v05a = _json(V05A_STATUS_FILE)
+    if state and v05a:
+        market = state.setdefault("market", {})
+        if isinstance(market, dict):
+            timeframes = v05a.get("timeframes") if isinstance(v05a.get("timeframes"), dict) else {}
+            market["bid"], market["ask"] = v05a.get("latest_bid"), v05a.get("latest_ask")
+            market["latest_m5_utc"] = (timeframes.get("M5") or {}).get("last_bar_close_utc")
+            market["latest_m15_utc"] = (timeframes.get("M15") or {}).get("last_bar_close_utc")
     if not state:
         ledger_cycle: dict[str, object] = {"status": "STATE_UNAVAILABLE", "rows_added": 0}
     else:
-        try:
-            ledger_cycle = ingest_state(state, now)
-        except ValueError as exc:
-            value = str(exc)
-            ledger_cycle = {"status": "RETROACTIVE_SHADOW_REJECTED" if "RETROACTIVE_SHADOW_REJECTED" in value else "STATE_CONTRACT_REJECTED", "rows_added": 0, "detail": value}
+        eligibility = recording_eligibility(state)
+        if not eligibility["eligible"]:
+            ledger_cycle = {"status": eligibility["status"], "rows_added": 0, "reason": eligibility["reason"]}
+        else:
+            try:
+                ledger_cycle = ingest_state(state, now)
+                ledger_cycle["reason"] = eligibility["reason"]
+            except ValueError as exc:
+                value = str(exc)
+                ledger_cycle = {"status": "RETROACTIVE_SHADOW_REJECTED" if "RETROACTIVE_SHADOW_REJECTED" in value else "STATE_CONTRACT_REJECTED", "rows_added": 0, "detail": value}
     outcome_cycle = attach_matured_outcomes(PREDICTIONS_FILE, now_utc=now)
     window_cycle = _window_cycle(now)
     performance = generate_analysis(now)
     provider = _provider_cycle()
     research = _research_status()
     champion_count = int((((state.get("system") or {}).get("registry") or {}).get("champion_count") or 0))
+    horizon_state = ((state.get("predictions") or {}).get("horizons") or {})
     conflicts = len(list(CONFLICT_DIR.glob("*.parquet"))) if CONFLICT_DIR.exists() else 0
     fatal = conflicts > 0 or int(outcome_cycle.get("early_violations", 0)) > 0 or int(outcome_cycle.get("contract_mismatch", 0)) > 0 or ledger_cycle.get("status") == "STATE_CONTRACT_REJECTED"
     final = "FAIL" if fatal else "PASS_MONITORING_NO_CHAMPION" if champion_count == 0 else "PASS_SHADOW_EVALUATION_DEGRADED_PROVIDERS" if "DEGRADED" in set(provider.get("providers", {}).values()) else "PASS_SHADOW_EVALUATION"
     if final not in FINAL_STATUSES:
         final = "FAIL"
+    live_shadow = shadow_summary(now_utc=now)
+    _live_shadow_report(live_shadow, ledger_cycle)
     payload: dict[str, object] = {
         "contract_version": "v0.8-forward-shadow-monitor-v1", "updated_at_utc": now.isoformat(),
         "status": final, "ledger_cycle": ledger_cycle, "outcome_cycle": outcome_cycle, "window_cycle": window_cycle,
-        "performance": performance, "provider_health": provider, "research": research,
-        "champions": {str(horizon): "NONE" if champion_count == 0 else "SEE_V05C_REGISTRY" for horizon in HORIZONS},
+        "performance": performance, "live_shadow": live_shadow,
+        "provider_health": provider, "research": research,
+        "champions": {str(horizon): ((horizon_state.get(str(horizon)) or {}).get("model_id") or "NONE") for horizon in HORIZONS},
         "manual_execution_only": True, "trading_enabled": False,
     }
     _atomic_json(payload, LATEST_STATUS_FILE)

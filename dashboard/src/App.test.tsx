@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import type { MarketFusionState, OperatorStatus } from "./types/marketfusion";
+import type { MarketFusionState, OperatorStatus, ShadowRecent, ShadowSummary } from "./types/marketfusion";
 import { localTime } from "./utils/format";
 
 const state: MarketFusionState = {
@@ -40,7 +40,16 @@ function response(data: object, freshness = "FRESH") {
   return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data), headers: new Headers({ "X-MarketFusion-State-Freshness": freshness }) } as Response);
 }
 
-function mockHealthyFetch(operatorValue: OperatorStatus = operator) {
+const emptyShadow: ShadowSummary = {
+  contract_version: "v0.8-live-shadow-observation-v1", status: "NO_LIVE_SHADOW_OBSERVATIONS_YET",
+  recorder: { status: "RUNNING", trigger: "NEW_COMPLETED_CAUSAL_DECISION_ROW", last_cycle_reason: "MARKET_CLOSED_WEEKEND" },
+  total_observations: 0, performance_observations: 0,
+  counts: { PENDING: 0, PENDING_DATA: 0, EVALUATED: 0, INVALID: 0, NO_APPROVED_MODEL: 0 },
+  horizons: { "15": { horizon_minutes: 15, total_recorded: 0, sample_count: 0, sample_status: "INSUFFICIENT_DATA", PENDING: 0, PENDING_DATA: 0, EVALUATED: 0, INVALID: 0, NO_APPROVED_MODEL: 0, accuracy: null, balanced_accuracy: null, macro_f1: null, mean_log_loss: null, mean_brier_score: null, average_confidence: null } }, latest_observation: null
+};
+const emptyRecent: ShadowRecent = { contract_version: "v0.8-live-shadow-observation-v1", status: "PASS", count: 0, limit: 20, items: [], trading_enabled: false };
+
+function mockHealthyFetch(operatorValue: OperatorStatus = operator, shadow: ShadowSummary = emptyShadow, recent: ShadowRecent = emptyRecent) {
   vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/state") return response(state);
@@ -50,6 +59,8 @@ function mockHealthyFetch(operatorValue: OperatorStatus = operator) {
     if (url === "/api/intelligence") return response({ status: "PASS_RUNNING_DEGRADED", captured_at_utc: null, news_counts: { "15": 0, "60": 0, "240": 0, "1440": 1 }, macro: {}, provider_health: { FED_RSS: "OK", ECB: "OK", BLS: "OK", GDELT: "DEGRADED", FRED: "DEGRADED" } });
     if (url === "/api/events") return response({ status: "PASS", events: [] });
     if (url === "/api/v08/status") return response({ contract_version: "v0.8-forward-shadow-monitor-v1", status: "PASS_MONITORING_NO_CHAMPION", performance: { recorded_predictions: 1, matured_outcomes: 0, horizons: { "15": { matured_count: 0, directional_calls: 0, wait_rate: null, directional_accuracy: null, brier: null, sample_status: "INSUFFICIENT_DATA" }, "60": { matured_count: 0, directional_calls: 0, wait_rate: null, directional_accuracy: null, brier: null, sample_status: "INSUFFICIENT_DATA" }, "240": { matured_count: 0, directional_calls: 0, wait_rate: null, directional_accuracy: null, brier: null, sample_status: "INSUFFICIENT_DATA" } }, wait: { wait_rate: null }, calibration_status: "NO_APPROVED_MODEL_DATA", market_drift_status: "INSUFFICIENT_DATA", model_drift_status: "INSUFFICIENT_DATA" }, champions: { "15": "NONE", "60": "NONE", "240": "NONE" }, provider_health: { status: "PASS", providers: {}, uptime_percentage: {} }, research: { status: "AVAILABLE_NOT_RUN", experiments: 0, best_experiment: null, decision: "INSUFFICIENT_DATA" }, manual_execution_only: true, trading_enabled: false });
+    if (url === "/api/evaluation/shadow/summary") return response(shadow);
+    if (url.startsWith("/api/evaluation/shadow/recent")) return response(recent);
     return response({ status: "RESEARCH_ONLY", approved_champions: 0, candidates: {}, last_training_utc: null, market_core_rows: 8558, history_days: 39, v05b_eligibility: "INSUFFICIENT_HISTORY", live_surprise_samples: 0, next_recommended_training: "DAILY_MANUAL_SCHEDULE" });
   }));
 }
@@ -74,4 +85,16 @@ describe("MarketFusion dashboard safety UI", () => {
   });
   it("shows degraded intelligence without changing market core", async () => { mockHealthyFetch(); render(<App />); await waitFor(() => expect(screen.getByText("V05A MARKET")).toBeInTheDocument()); expect(screen.getByText("V05B INTELLIGENCE")).toBeInTheDocument(); });
   it("shows V0.8 insufficient forward history without fake metrics", async () => { mockHealthyFetch(); render(<App />); expect(await screen.findByText(/Shadow Performance/i)).toBeInTheDocument(); expect(screen.getAllByText("INSUFFICIENT DATA").length).toBeGreaterThan(0); });
+  it("shows the live shadow recorder running with an honest no-data state", async () => { mockHealthyFetch(); render(<App />); expect(await screen.findByText(/Live Shadow Validation/i)).toBeInTheDocument(); expect(screen.getByText("NO LIVE SHADOW OBSERVATIONS YET")).toBeInTheDocument(); expect(screen.getByText("MARKET CLOSED WEEKEND")).toBeInTheDocument(); });
+  it("renders a pending real observation without fake actual data", async () => {
+    const observation = { observation_id: "a".repeat(64), decision_timestamp_utc: "2026-08-24T12:00:00Z", evaluation_due_utc: "2026-08-24T12:15:00Z", horizon_minutes: 15, model_id: "champion", model_status: "APPROVED_CHAMPION", predicted_class: "DOWN", prob_down: .7, prob_neutral: .2, prob_up: .1, model_confidence: .7, v06c_decision: "WAIT", v06c_gate: "WAIT_EVENT_DATA_INCOMPLETE", actual_class: null, actual_return: null, direction_correct: null, evaluation_status: "PENDING", blocking_reasons: ["EVENT_DATA_INCOMPLETE"] };
+    const summary = { ...emptyShadow, status: "AVAILABLE", performance_observations: 1, total_observations: 3, counts: { ...emptyShadow.counts, PENDING: 1, NO_APPROVED_MODEL: 2 }, latest_observation: observation };
+    const recent = { ...emptyRecent, count: 1, items: [observation] };
+    mockHealthyFetch(operator, summary, recent); render(<App />); expect(await screen.findByText("LATEST PREDICTION")).toBeInTheDocument(); expect(screen.getAllByText("PENDING").length).toBeGreaterThan(0); expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);
+  });
+  it("renders an evaluated observation with actual result", async () => {
+    const observation = { observation_id: "b".repeat(64), decision_timestamp_utc: "2026-08-24T12:00:00Z", evaluation_due_utc: "2026-08-24T12:15:00Z", horizon_minutes: 15, model_id: "champion", model_status: "APPROVED_CHAMPION", predicted_class: "DOWN", prob_down: .7, prob_neutral: .2, prob_up: .1, model_confidence: .7, v06c_decision: "WAIT", v06c_gate: "WAIT_EVENT_DATA_INCOMPLETE", actual_class: "DOWN", actual_return: -.0014, direction_correct: true, evaluation_status: "EVALUATED", blocking_reasons: ["EVENT_DATA_INCOMPLETE"] };
+    const summary = { ...emptyShadow, status: "AVAILABLE", performance_observations: 1, total_observations: 3, counts: { ...emptyShadow.counts, EVALUATED: 1, NO_APPROVED_MODEL: 2 }, latest_observation: observation };
+    mockHealthyFetch(operator, summary, { ...emptyRecent, count: 1, items: [observation] }); render(<App />); expect(await screen.findAllByText("CORRECT")).not.toHaveLength(0); expect(screen.getAllByText("DOWN").length).toBeGreaterThan(0); expect(screen.getAllByText("-0.140%").length).toBeGreaterThan(0);
+  });
 });

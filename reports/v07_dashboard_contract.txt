@@ -17,10 +17,15 @@ GET /api/events
 GET /api/intelligence
 GET /api/research
 GET /api/system/version
+GET /api/v08/status
+GET /api/evaluation/shadow/summary
+GET /api/evaluation/shadow/recent?limit=50
+GET /api/evaluation/shadow/observations/{id}
 
 candle_timeframes: M1,M5,M15,H1
 candle_limit_max: 1000
 runtime_history_limit_max: 1000
+shadow_recent_limit_max: 200
 trading_endpoints: 0
 account_data: FORBIDDEN
 order_and_position_data: FORBIDDEN

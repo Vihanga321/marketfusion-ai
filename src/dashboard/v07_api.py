@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.dashboard.v07_contract import (
@@ -20,6 +20,8 @@ from src.dashboard.v07_contract import (
 )
 from src.dashboard.v07_market import load_candles
 from src.dashboard.v07_operator import build_operator_status, latest_quote_timestamp
+from src.evaluation.v08_contract import MAX_OBSERVATION_API_LIMIT
+from src.evaluation.v08_observations import json_records, observations_frame, shadow_summary
 
 
 def _utc(value: object) -> pd.Timestamp:
@@ -276,6 +278,45 @@ def v08_status() -> dict[str, object]:
         "research": {"status": "AVAILABLE_NOT_RUN", "experiments": 0, "best_experiment": None, "decision": "INSUFFICIENT_DATA"},
         "manual_execution_only": True, "trading_enabled": False,
     }
+
+
+@app.get("/api/evaluation/shadow/summary")
+def shadow_evaluation_summary() -> dict[str, object]:
+    summary = shadow_summary()
+    monitor = _safe_json(V08_STATUS_FILE)
+    cycle = monitor.get("ledger_cycle") if isinstance(monitor.get("ledger_cycle"), dict) else {}
+    summary["recorder"] = {
+        "status": "RUNNING" if monitor else "STATUS_UNAVAILABLE",
+        "trigger": "NEW_COMPLETED_CAUSAL_DECISION_ROW",
+        "last_cycle_status": cycle.get("status", "NOT_RUN"),
+        "last_cycle_reason": cycle.get("reason") or cycle.get("detail") or "NOT_AVAILABLE",
+        "updated_at_utc": monitor.get("updated_at_utc"),
+    }
+    return summary
+
+
+@app.get("/api/evaluation/shadow/recent")
+def recent_shadow_observations(limit: int = Query(50, ge=1, le=MAX_OBSERVATION_API_LIMIT)) -> dict[str, object]:
+    frame = observations_frame()
+    items = json_records(frame.head(limit)) if not frame.empty else []
+    return {
+        "contract_version": "v0.8-live-shadow-observation-v1", "status": "PASS",
+        "count": len(items), "limit": limit, "items": items,
+        "trading_enabled": False,
+    }
+
+
+@app.get("/api/evaluation/shadow/observations/{observation_id}")
+def shadow_observation_detail(observation_id: str) -> dict[str, object]:
+    if len(observation_id) != 64 or any(value not in "0123456789abcdef" for value in observation_id.lower()):
+        raise HTTPException(status_code=404, detail="Shadow observation not found")
+    frame = observations_frame()
+    if frame.empty:
+        raise HTTPException(status_code=404, detail="Shadow observation not found")
+    matching = frame.loc[frame["observation_id"].eq(observation_id)]
+    if matching.empty:
+        raise HTTPException(status_code=404, detail="Shadow observation not found")
+    return json_records(matching.head(1))[0]
 
 
 def trading_route_count() -> int:

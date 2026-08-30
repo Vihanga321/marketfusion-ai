@@ -4,6 +4,7 @@ import { CandleChart } from "./components/CandleChart";
 import { OperatorPanels } from "./components/OperatorPanels";
 import { Metric, Panel, StatusDot } from "./components/Panel";
 import { PredictionCard } from "./components/PredictionCard";
+import { LiveShadowValidation } from "./components/LiveShadowValidation";
 import { useCandles } from "./hooks/useCandles";
 import { useMarketFusionState } from "./hooks/useMarketFusionState";
 import { useSupplementary } from "./hooks/useSupplementary";
@@ -16,7 +17,7 @@ export default function App() {
   const { state, connection, lastSuccess } = useMarketFusionState();
   const [timeframe, setTimeframe] = useState<Timeframe>("M5");
   const { candles, status: candleStatus } = useCandles(timeframe);
-  const { market: quote, intelligence, research, events, monitoring, operator } = useSupplementary();
+  const { market: quote, intelligence, research, events, monitoring, operator, shadowSummary, shadowRecent } = useSupplementary();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
 
@@ -88,6 +89,8 @@ export default function App() {
         <div className="inline-detail"><span>Directional margin</span><b>{probability(fusion?.margin)}</b><span>Fusion action</span><b className="tone-warn">{action.replace("_", " ")}</b></div>
       </Panel>
     </div>
+
+    <LiveShadowValidation summary={shadowSummary} recent={shadowRecent} />
 
     <div className="detail-grid">
       <Panel title="Event Risk" eyebrow="AUDITED TARGET EVENTS" className="event-panel">

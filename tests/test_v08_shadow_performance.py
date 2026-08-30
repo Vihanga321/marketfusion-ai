@@ -41,7 +41,14 @@ def state() -> dict[str, object]:
 
 
 def prediction_frame() -> pd.DataFrame:
-    return pd.DataFrame([build_prediction_record(state(), "2026-08-24T12:02:00Z", "test")])
+    value = state()
+    for horizon in HORIZONS:
+        value["predictions"]["horizons"][str(horizon)] = {  # type: ignore[index]
+            "model_id": f"approved-{horizon}", "model_status": "APPROVED_CHAMPION",
+            "prob_down": 0.1, "prob_neutral": 0.2, "prob_up": 0.7,
+            "shadow_direction": "UP", "decision_gate": "PASS_SHADOW_INFERENCE",
+        }
+    return pd.DataFrame([build_prediction_record(value, "2026-08-24T12:02:00Z", "test")])
 
 
 def market_frame(include: tuple[int, ...] = HORIZONS) -> pd.DataFrame:
@@ -158,7 +165,7 @@ class OutcomeTests(unittest.TestCase):
     def test_wrong_exact_timestamp_is_contract_mismatch(self):
         market = market_frame(); market.loc[0, "outcome_future_timestamp_15m"] = DECISION + pd.Timedelta(minutes=16)
         result, stats = matured_outcome_rows(prediction_frame(), market, "2026-08-24T12:15:00Z")
-        self.assertTrue(result.empty); self.assertEqual(stats["contract_mismatch"], 1)
+        self.assertEqual(result.iloc[0]["outcome_status"], "INVALID"); self.assertEqual(stats["contract_mismatch"], 1)
 
     def test_existing_outcome_deduplicates(self):
         first, _ = matured_outcome_rows(prediction_frame(), market_frame(), "2026-08-24T12:15:00Z")

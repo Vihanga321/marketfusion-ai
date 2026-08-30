@@ -133,6 +133,54 @@ export interface V08Status {
   manual_execution_only: true;
   trading_enabled: false;
 }
+export interface ShadowObservation {
+  observation_id: string;
+  decision_timestamp_utc: string;
+  evaluation_due_utc: string | null;
+  horizon_minutes: number;
+  model_id: string | null;
+  model_status: string;
+  predicted_class: string | null;
+  prob_down: number | null;
+  prob_neutral: number | null;
+  prob_up: number | null;
+  model_confidence: number | null;
+  v06c_decision: string;
+  v06c_gate: string | null;
+  actual_class: string | null;
+  actual_return: number | null;
+  direction_correct: boolean | null;
+  evaluation_status: string;
+  blocking_reasons: string[];
+}
+export interface ShadowHorizonSummary {
+  horizon_minutes: number;
+  total_recorded: number;
+  sample_count: number;
+  sample_status: string;
+  PENDING: number;
+  PENDING_DATA: number;
+  EVALUATED: number;
+  INVALID: number;
+  NO_APPROVED_MODEL: number;
+  accuracy: number | null;
+  balanced_accuracy: number | null;
+  macro_f1: number | null;
+  mean_log_loss: number | null;
+  mean_brier_score: number | null;
+  average_confidence: number | null;
+}
+export interface ShadowSummary {
+  contract_version: string;
+  status: string;
+  recorder: { status: string; trigger: string; last_cycle_status?: string; last_cycle_reason: string; updated_at_utc?: string | null };
+  total_observations: number;
+  performance_observations: number;
+  counts: Record<string, number>;
+  horizons: Record<string, ShadowHorizonSummary>;
+  latest_observation: ShadowObservation | null;
+}
+export interface ShadowRecent { contract_version: string; status: string; count: number; limit: number; items: ShadowObservation[]; trading_enabled: false }
 export interface OperatorStatus {
   contract_version: string;
   current_time: DualTime;

@@ -1,6 +1,7 @@
 MARKETFUSION V0.8 FORWARD SHADOW CONTRACT
 
 contract: v0.8-forward-shadow-monitor-v1
+observation_contract: v0.8-live-shadow-observation-v1
 scope: TRUE_FORWARD_SHADOW
 historical_research_scope: BACKTEST_RESEARCH
 trading_execution: DISABLED_NOT_IMPLEMENTED
@@ -15,6 +16,7 @@ provider_uptime_ledger: data/evaluation/v08/provider_uptime.parquet
 mutation_quarantine: data/evaluation/v08/conflicts/
 
 prediction_uniqueness: symbol + decision_timestamp_utc
+observation_uniqueness: symbol + decision_timestamp_utc + horizon_minutes + model_id
 prediction_payload_integrity: canonical SHA256
 same_payload_duplicate: DEDUPLICATE
 changed_payload_duplicate: PREDICTION_MUTATION_CONFLICT
@@ -22,10 +24,19 @@ original_prediction_overwrite: FORBIDDEN
 outcomes_inside_prediction_payload: FORBIDDEN
 retroactive_prediction_generation: FORBIDDEN
 maximum_forward_record_delay_minutes: 10
+recording_trigger: one new completed causal decision row
+live_recording_freshness: LIVE_OR_FRESH_ONLY
+weekend_stale_repeat_policy: NO_NEW_FRESH_DECISION_EVENT
+no_approved_model_probabilities: NULL
 
 horizons_minutes: 15,60,240
 future_timestamp_rule: decision_timestamp_utc + exact horizon
+entry_reference_type: COMPLETED_M5_CLOSE
+exit_reference_type: EXACT_FUTURE_COMPLETED_M5_CLOSE
+target_class_rule: EXACT_V05C_DECISION_COST_BAND
 missing_market_data_policy: NO_INTERPOLATION
+missing_matured_data_status: PENDING_DATA
+invalid_evidence_policy: RETAIN_WITH_REASON_EXCLUDE_FROM_PERFORMANCE
 future_spread_use: FORBIDDEN
 commission_status: UNKNOWN
 performance_label: DESCRIPTIVE_SHADOW_PERFORMANCE
@@ -42,3 +53,4 @@ v08_registry_write: FORBIDDEN
 formal_promotion_owner: V0.5C
 heavy_research_schedule: MANUAL_OR_WEEKLY
 continuous_monitor_schedule_seconds: 300
+read_only_api: /api/evaluation/shadow/summary, /api/evaluation/shadow/recent, /api/evaluation/shadow/observations/{id}

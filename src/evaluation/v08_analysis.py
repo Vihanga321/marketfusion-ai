@@ -26,6 +26,8 @@ def joined_forward_rows(
         return pd.DataFrame()
     predictions = pd.read_parquet(predictions_path)
     outcomes = pd.read_parquet(outcomes_path)
+    if "outcome_status" in outcomes:
+        outcomes = outcomes.loc[outcomes["outcome_status"].eq("MATURED")].copy()
     if predictions.empty or outcomes.empty:
         return pd.DataFrame()
     joined = outcomes.merge(predictions, on=["prediction_id", "prediction_payload_sha256", "source_label", "decision_timestamp_utc"], how="inner", validate="many_to_one")
