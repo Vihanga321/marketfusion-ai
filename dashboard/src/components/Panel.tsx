@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { MarketOpenBadge } from "./MarketOpenBadge";
 
 export function Panel({ title, eyebrow, className = "", children, action }: { title: string; eyebrow?: string; className?: string; children: ReactNode; action?: ReactNode }) {
+  const resolvedAction = action ?? (className.includes("decision-panel") ? <MarketOpenBadge /> : null);
   return <section className={`panel ${className}`}>
-    <header className="panel-header"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h2>{title}</h2></div>{action}</header>
+    <header className="panel-header"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h2>{title}</h2></div>{resolvedAction}</header>
     {children}
   </section>;
 }
