@@ -30,6 +30,27 @@ export function duration(seconds?: number | null): string {
   if (minutes) return `${minutes}m ${secs}s`;
   return `${secs}s`;
 }
+export function formatCountdown(milliseconds: number): string {
+  if (!Number.isFinite(milliseconds)) return dash;
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(total / 86400); const hours = Math.floor((total % 86400) / 3600); const minutes = Math.floor((total % 3600) / 60); const secs = total % 60;
+  const clock = `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+  return days ? `${days}d ${clock}` : hours ? clock : `${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+}
+export function countdownState(marketOpen: boolean, target?: string | null, now = Date.now()): "OPEN" | "COUNTDOWN" | "OPENING" | "UNKNOWN" {
+  if (marketOpen) return "OPEN";
+  if (!target) return "UNKNOWN";
+  const timestamp = new Date(target).getTime();
+  if (!Number.isFinite(timestamp)) return "UNKNOWN";
+  return timestamp <= now ? "OPENING" : "COUNTDOWN";
+}
+export function formatColomboOpening(utc?: string | null): string {
+  if (!utc || !Number.isFinite(new Date(utc).getTime())) return "UNKNOWN";
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }).formatToParts(new Date(utc));
+  const value = (type: string) => parts.find(part => part.type === type)?.value ?? "";
+  const month = value("month").slice(0, 3).toUpperCase();
+  return `${value("day")} ${month} • ${value("hour")}:${value("minute")} ${value("dayPeriod").toUpperCase()} LKT`;
+}
 export function ageFrom(utc?: string | null, now = Date.now()): string {
   if (!utc) return dash;
   const timestamp = new Date(utc).getTime();

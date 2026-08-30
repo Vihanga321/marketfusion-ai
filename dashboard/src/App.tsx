@@ -5,6 +5,7 @@ import { OperatorPanels } from "./components/OperatorPanels";
 import { Metric, Panel, StatusDot } from "./components/Panel";
 import { PredictionCard } from "./components/PredictionCard";
 import { LiveShadowValidation } from "./components/LiveShadowValidation";
+import { MarketOpenCountdown, useServerClock } from "./components/MarketOpenCountdown";
 import { useCandles } from "./hooks/useCandles";
 import { useMarketFusionState } from "./hooks/useMarketFusionState";
 import { useSupplementary } from "./hooks/useSupplementary";
@@ -20,6 +21,7 @@ export default function App() {
   const { market: quote, intelligence, research, events, monitoring, operator, shadowSummary, shadowRecent, engines } = useSupplementary();
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+  const serverOffsetMs = useServerClock(operator);
 
   const safe = connection === "LIVE";
   const action: AdvisoryAction = safe && state ? state.decision.action : "WAIT";
@@ -52,6 +54,7 @@ export default function App() {
         <StatusDot label="MT5" value={quote?.status?.startsWith("PASS") ? "CONNECTED" : "UNAVAILABLE"} />
         <StatusDot label="API HEALTH" value={operator?.system_health.status ?? (connection === "LIVE" ? "PASS" : "DEGRADED")} />
         <StatusDot label="MARKET" value={marketBadge} tone={operator?.market.market_open ? "good" : "warn"} />
+        <MarketOpenCountdown operator={operator} now={now} serverOffsetMs={serverOffsetMs} />
         <StatusDot label="DATA" value={dataBadge} tone={dataBadge === "LIVE" || dataBadge === "FRESH" ? "good" : "warn"} />
         <StatusDot label="MODE" value="SHADOW" tone="info" />
         <StatusDot label="MODELS" value={`${approved}/3`} tone={approved === 3 ? "good" : "warn"} />
