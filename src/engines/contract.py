@@ -1,10 +1,42 @@
-"""Stable output contract for observational engine analysis."""
+"""Stable contracts for causal, observational market-structure analysis."""
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
-ENGINE_CONTRACT_VERSION = "v0.9a-engine-output-v1"
+ENGINE_CONTRACT_VERSION = "v0.9a1-engine-output-v2"
 EngineStatus = Literal["AVAILABLE", "PARTIAL", "UNAVAILABLE", "INVALID"]
+PatternStatus = Literal["FORMING", "CONFIRMED", "BROKEN", "INVALIDATED"]
+Direction = Literal["BULLISH", "BEARISH", "NEUTRAL"]
+
+
+class SwingPoint(TypedDict):
+    swing_id: str
+    timeframe: str
+    kind: Literal["HIGH", "LOW"]
+    pivot_time_utc: str
+    confirmed_at_utc: str
+    price: float
+    left_bars: int
+    right_bars: int
+
+
+class PatternRecord(TypedDict, total=False):
+    pattern_id: str
+    pattern_type: str
+    timeframe: str
+    detected_at_utc: str
+    confirmed_at_utc: str | None
+    status: PatternStatus
+    direction: Direction
+    score: float
+    confidence: float
+    start_time_utc: str
+    end_time_utc: str
+    upper_boundary: float | None
+    lower_boundary: float | None
+    breakout_level: float | None
+    invalidation_level: float | None
+    evidence: dict[str, Any]
 
 class EngineOutput(TypedDict, total=False):
     engine_name: str
@@ -17,7 +49,7 @@ class EngineOutput(TypedDict, total=False):
     feature_count: int
     input_freshness: str
     reason_codes: list[str]
-    components: dict[str, float | str | None]
+    components: dict[str, Any]
 
 
 def unavailable(engine_name: str, reason: str = "INPUT_UNAVAILABLE") -> EngineOutput:

@@ -15,6 +15,7 @@ from src.evaluation.v08_contract import (
     HORIZONS, LEGACY_PREDICTION_COLUMNS, LIVE_DATA_FRESHNESS,
     MAX_FORWARD_RECORD_DELAY_MINUTES, OBSERVATION_CONTRACT_VERSION, PREDICTION_COLUMNS,
     PREDICTIONS_FILE, SOURCE_LABEL,
+    V1_PREDICTION_COLUMNS,
 )
 
 
@@ -54,7 +55,12 @@ def prediction_sha(record: dict[str, object]) -> str:
         has_version = version is not None and not bool(pd.isna(version))
     except (TypeError, ValueError):
         has_version = bool(version)
-    columns = PREDICTION_COLUMNS if has_version else LEGACY_PREDICTION_COLUMNS
+    if version == OBSERVATION_CONTRACT_VERSION:
+        columns = PREDICTION_COLUMNS
+    elif has_version:
+        columns = V1_PREDICTION_COLUMNS
+    else:
+        columns = LEGACY_PREDICTION_COLUMNS
     payload = {key: _canonical(record.get(key)) for key in columns if key not in excluded}
     return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")).hexdigest()
 
@@ -112,7 +118,7 @@ def validate_prediction_columns(columns: list[str] | tuple[str, ...]) -> None:
 
 def build_prediction_record(
     state: dict[str, Any], recorded_at_utc: object | None = None, git_commit: str | None = None,
-    enforce_forward_deadline: bool = True,
+    enforce_forward_deadline: bool = True, engine_observed_at_utc: object | None = None,
 ) -> dict[str, object]:
     recorded = pd.Timestamp.now(tz="UTC") if recorded_at_utc is None else utc(recorded_at_utc)
     decision = ((state.get("decision") or {}).get("decision_time") or {}).get("utc")
@@ -143,6 +149,19 @@ def build_prediction_record(
     blockers = sorted(str(item.get("code")) for item in reasons if item.get("blocking"))
     risk = "BLOCKING" if blockers else "CAUTION" if reasons else "NORMAL"
     model_hashes = sorted({str(item.get("feature_contract_hash")) for item in horizons.values() if item.get("feature_contract_hash")})
+    try:
+        from src.engines.engine_layer import decision_engine_snapshot
+        engine_snapshot = decision_engine_snapshot(decision_time, engine_observed_at_utc or recorded)
+    except Exception as exc:
+        engine_snapshot = {
+            "contract_version": None, "decision_timestamp_utc": decision_time.isoformat(),
+            "engines": {}, "chart_pattern": None, "structure_event": None,
+            "liquidity_event": None, "observational_only": True,
+            "status": "UNAVAILABLE", "reason": type(exc).__name__,
+        }
+    chart_pattern = engine_snapshot.get("chart_pattern") or {}
+    structure_event = engine_snapshot.get("structure_event") or {}
+    liquidity_event = engine_snapshot.get("liquidity_event") or {}
     prediction_id = sha256(f"{(state.get('system') or {}).get('symbol', 'EURUSD')}|{decision_time.isoformat()}".encode()).hexdigest()
     record: dict[str, object] = {
         "prediction_id": prediction_id, "prediction_payload_sha256": None,
@@ -177,6 +196,15 @@ def build_prediction_record(
         "v06c_status": (state.get("system") or {}).get("status"), "v06c_gate": decision_payload.get("gate"),
         "trading_enabled": False, "manual_confirmation_required": True,
         "entry_reference_type": "COMPLETED_M5_CLOSE", "exit_reference_type": "EXACT_FUTURE_COMPLETED_M5_CLOSE",
+        "engine_snapshot_contract": engine_snapshot.get("contract_version"),
+        "engine_snapshot_json": json.dumps(_canonical(engine_snapshot), sort_keys=True, separators=(",", ":")),
+        "chart_pattern_type": chart_pattern.get("pattern_type"), "chart_pattern_score": chart_pattern.get("score"),
+        "chart_pattern_timeframe": chart_pattern.get("timeframe"),
+        "nearest_support_distance_price": engine_snapshot.get("nearest_support_distance_price"),
+        "nearest_resistance_distance_price": engine_snapshot.get("nearest_resistance_distance_price"),
+        "structure_event_type": structure_event.get("event_type"), "structure_event_time_utc": structure_event.get("detected_at_utc"),
+        "liquidity_event_type": liquidity_event.get("event_type"), "liquidity_event_time_utc": liquidity_event.get("detected_at_utc"),
+        "engine_observational_only": True,
     }
     for horizon in HORIZONS:
         item = horizons.get(str(horizon)) or {}
@@ -229,10 +257,15 @@ def ingest_state(
 ) -> dict[str, object]:
     decision = (((state.get("decision") or {}).get("decision_time") or {}).get("utc"))
     already_recorded = False
+    original_observed_at = None
     if decision and path.exists():
-        existing = pd.read_parquet(path, columns=["decision_timestamp_utc"])
-        already_recorded = existing["decision_timestamp_utc"].astype(str).eq(utc(decision).isoformat()).any()
+        existing = pd.read_parquet(path, columns=["decision_timestamp_utc", "recorded_at_utc"])
+        matching = existing.loc[existing["decision_timestamp_utc"].astype(str).eq(utc(decision).isoformat())]
+        already_recorded = not matching.empty
+        if already_recorded:
+            original_observed_at = matching.iloc[0]["recorded_at_utc"]
     record = build_prediction_record(
         state, recorded_at_utc, git_commit, enforce_forward_deadline=not already_recorded,
+        engine_observed_at_utc=original_observed_at,
     )
     return append_prediction(record, path, conflict_dir)

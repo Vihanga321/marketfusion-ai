@@ -1,0 +1,17 @@
+MARKETFUSION V0.9A.1 PATTERN RESEARCH
+
+mode: RESEARCH_ONLY
+production_retrain: DISABLED
+model_promotion: DISABLED
+detected_patterns: 813
+report_groups: 261
+sample_sufficient_groups: 0
+claim: DESCRIPTIVE_ONLY_NO_PREDICTIVE_EDGE_INFERENCE
+
+ABLATION_GROUPS
+BASE_V09A: technical,volatility,session,regime
+PRICE_ACTION: candle_geometry,breakouts,retests
+STRUCTURE: confirmed_swings,hh_hl_lh_ll,bos_choch
+LIQUIDITY: equal_extrema,sweeps,fair_value_gaps
+CHART_PATTERNS: reversal_patterns,continuation_patterns,consolidation_patterns
+SUPPORT_RESISTANCE: swing_levels,completed_period_levels,ema,fibonacci

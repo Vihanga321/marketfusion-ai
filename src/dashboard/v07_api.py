@@ -20,9 +20,9 @@ from src.dashboard.v07_contract import (
 )
 from src.dashboard.v07_market import load_candles
 from src.dashboard.v07_operator import build_operator_status, latest_quote_timestamp
-from src.evaluation.v08_contract import MAX_OBSERVATION_API_LIMIT
+from src.evaluation.v08_contract import MAX_OBSERVATION_API_LIMIT, OBSERVATION_CONTRACT_VERSION
 from src.evaluation.v08_observations import json_records, observations_frame, shadow_summary
-from src.engines.engine_layer import engine_status
+from src.engines.engine_layer import engine_status, recent_patterns
 
 
 def _utc(value: object) -> pd.Timestamp:
@@ -228,6 +228,11 @@ def engines_status() -> dict[str, object]:
     return engine_status()
 
 
+@app.get("/api/engines/patterns/recent")
+def engines_recent_patterns(limit: int = Query(20, ge=1, le=100)) -> dict[str, object]:
+    return recent_patterns(limit=limit)
+
+
 @app.get("/api/research")
 def research() -> dict[str, object]:
     candidates: dict[str, object] = {}
@@ -306,7 +311,7 @@ def recent_shadow_observations(limit: int = Query(50, ge=1, le=MAX_OBSERVATION_A
     frame = observations_frame()
     items = json_records(frame.head(limit)) if not frame.empty else []
     return {
-        "contract_version": "v0.8-live-shadow-observation-v1", "status": "PASS",
+        "contract_version": OBSERVATION_CONTRACT_VERSION, "status": "PASS",
         "count": len(items), "limit": limit, "items": items,
         "trading_enabled": False,
     }

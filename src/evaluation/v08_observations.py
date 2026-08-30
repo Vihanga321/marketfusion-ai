@@ -38,6 +38,18 @@ def _json_list(value: object) -> list[str]:
         return [str(item) for item in value]
     if value is None:
         return []
+
+
+def _json_dict(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if value is None:
+        return {}
+    try:
+        parsed = json.loads(str(value))
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
     try:
         parsed = json.loads(str(value))
         return [str(item) for item in parsed] if isinstance(parsed, list) else []
@@ -180,6 +192,15 @@ def observations_frame(
                 "wait_protected": (not direction_correct) if advisory == "WAIT" and direction_correct is not None else None,
                 "volatility_regime": _value(prediction, "volatility_regime"),
                 "trend_regime": _value(prediction, "trend_regime"),
+                "engine_snapshot_contract": _value(prediction, "engine_snapshot_contract"),
+                "engine_snapshot": _json_dict(_value(prediction, "engine_snapshot_json")),
+                "chart_pattern_type": _value(prediction, "chart_pattern_type"),
+                "chart_pattern_score": _value(prediction, "chart_pattern_score"),
+                "chart_pattern_timeframe": _value(prediction, "chart_pattern_timeframe"),
+                "nearest_support_distance_price": _value(prediction, "nearest_support_distance_price"),
+                "nearest_resistance_distance_price": _value(prediction, "nearest_resistance_distance_price"),
+                "structure_event_type": _value(prediction, "structure_event_type"),
+                "liquidity_event_type": _value(prediction, "liquidity_event_type"),
             })
     return pd.DataFrame(rows).sort_values(["decision_timestamp_utc", "horizon_minutes"], ascending=[False, True]).reset_index(drop=True)
 

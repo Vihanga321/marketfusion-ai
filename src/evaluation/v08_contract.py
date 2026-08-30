@@ -6,7 +6,7 @@ from pathlib import Path
 from src.marketdata.v05a_contract import ROOT
 
 CONTRACT_VERSION = "v0.8-forward-shadow-monitor-v1"
-OBSERVATION_CONTRACT_VERSION = "v0.8-live-shadow-observation-v1"
+OBSERVATION_CONTRACT_VERSION = "v0.8-live-shadow-observation-v2"
 SOURCE_LABEL = "TRUE_FORWARD_SHADOW"
 RESEARCH_LABEL = "BACKTEST_RESEARCH"
 HORIZONS = (15, 60, 240)
@@ -65,13 +65,22 @@ LEGACY_PREDICTION_COLUMNS = (
 # The immutable decision ledger remains the durable source of truth.  These
 # fields add the live-validation capture context without creating a parallel
 # inference or evaluation store.  Legacy rows are intentionally readable.
-PREDICTION_COLUMNS = LEGACY_PREDICTION_COLUMNS + (
+V1_PREDICTION_COLUMNS = LEGACY_PREDICTION_COLUMNS + (
     "observation_contract_version", "market_status", "active_sessions", "market_bid", "market_ask",
     "data_freshness", "market_age_seconds", "latest_tick_utc", "latest_m5_utc",
     "latest_m15_utc", "feature_timestamp_utc", "feature_complete", "source_fresh",
     "target_event_guard", "v06b_gate", "v06c_status", "v06c_gate",
     "trading_enabled", "manual_confirmation_required",
     "entry_reference_type", "exit_reference_type",
+    *tuple(f"h{h}_gate" for h in HORIZONS),
+)
+
+PREDICTION_COLUMNS = V1_PREDICTION_COLUMNS[:-len(HORIZONS)] + (
+    "engine_snapshot_contract", "engine_snapshot_json",
+    "chart_pattern_type", "chart_pattern_score", "chart_pattern_timeframe",
+    "nearest_support_distance_price", "nearest_resistance_distance_price",
+    "structure_event_type", "structure_event_time_utc",
+    "liquidity_event_type", "liquidity_event_time_utc", "engine_observational_only",
     *tuple(f"h{h}_gate" for h in HORIZONS),
 )
 

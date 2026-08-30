@@ -41,6 +41,9 @@ export default function App() {
   const currentLocal = useMemo(() => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(now)), [now]);
   const marketBadge = operator?.market.status === "OPEN" ? "OPEN" : operator?.market.status === "CLOSED_WEEKEND" ? "CLOSED" : label(operator?.market.status);
   const dataBadge = operator?.data_freshness.status ?? "UNAVAILABLE";
+  const m5Intelligence = engines?.timeframes?.M5;
+  const m15Intelligence = engines?.timeframes?.M15;
+  const recentPatterns = engines?.recent_patterns?.slice(0, 5) ?? [];
 
   return <main className="app-shell">
     <header className="topbar">
@@ -76,13 +79,21 @@ export default function App() {
 
     <OperatorPanels operator={operator} now={now} connected={safe} />
 
-    <Panel title="Engine Intelligence" eyebrow="V0.9A OBSERVATIONAL ANALYSIS">
+    <Panel title="Engine Intelligence" eyebrow="V0.9A.1 OBSERVATIONAL ANALYSIS">
+      {(engines?.market_status === "CLOSED_WEEKEND" || engines?.data_freshness === "STALE") && <div className="engine-market-note"><AlertTriangle size={15} /><b>MARKET CLOSED / STALE OBSERVATION</b><span>Structure is frozen at the latest completed causal bars.</span></div>}
       <div className="engine-grid">{Object.values(engines?.engines ?? {}).map(engine => <article className="engine-card" key={engine.engine_name}>
         <div className="engine-card-head"><span>{engine.engine_name.replaceAll("_", " ")}</span><StatusDot label="STATUS" value={engine.status} /></div>
         <strong className={engine.direction_score == null ? "tone-muted" : engine.direction_score > 0.1 ? "tone-good" : engine.direction_score < -0.1 ? "tone-down" : "tone-muted"}>{engine.direction_score == null ? "UNAVAILABLE" : `${engine.direction_score >= 0 ? "+" : ""}${engine.direction_score.toFixed(2)}`}</strong>
         <div className="engine-meta"><span>{engine.regime ?? "NO REGIME"}</span><span>{engine.confidence == null ? "--" : `${Math.round(engine.confidence * 100)}% confidence`}</span></div>
         <small>{engine.reason_codes.join(" · ") || "No causal reason available"}</small>
       </article>)}</div>
+      <div className="structure-intelligence-grid">
+        <article><span>MARKET STRUCTURE</span>{[["M5",m5Intelligence],["M15",m15Intelligence]].map(([name,item]) => { const view = item as typeof m5Intelligence; const latest = view?.structure_events.at(-1); return <div className="intel-row" key={String(name)}><b>{String(name)}</b><strong>{label(view?.structure_state)}</strong><small>{latest ? `${label(latest.event_type)} · ${label(latest.direction)}` : "NO RECENT BOS / CHOCH"}</small></div>; })}</article>
+        <article><span>CHART PATTERNS · M5 / M15</span>{recentPatterns.length ? recentPatterns.map(item => <div className="intel-row" key={item.pattern_id}><b>{item.timeframe}</b><strong>{label(item.pattern_type)}</strong><small>{label(item.status)} · fit {(item.score * 100).toFixed(0)}% · {label(item.direction)}</small></div>) : <p>NO OBJECTIVE PATTERN DETECTED</p>}</article>
+        <article><span>SUPPORT / RESISTANCE · M5</span><div className="intel-row"><b>SUPPORT</b><strong>{number(m5Intelligence?.support_resistance.nearest_support?.price)}</strong><small>{number(m5Intelligence?.support_resistance.nearest_support?.distance_price)} distance</small></div><div className="intel-row"><b>RESISTANCE</b><strong>{number(m5Intelligence?.support_resistance.nearest_resistance?.price)}</strong><small>{number(m5Intelligence?.support_resistance.nearest_resistance?.distance_price)} distance</small></div></article>
+        <article><span>LIQUIDITY / FVG · M5</span><div className="intel-row"><b>LAST SWEEP</b><strong>{label(m5Intelligence?.liquidity.sweeps.at(-1)?.event_type)}</strong><small>{label(m5Intelligence?.liquidity.sweeps.at(-1)?.direction)}</small></div><div className="intel-row"><b>OPEN GAPS</b><strong>{m5Intelligence?.liquidity.fair_value_gaps.filter(item => item.status !== "FILLED").length ?? 0}</strong><small>MECHANICAL THREE-BAR DEFINITION</small></div></article>
+        <article><span>PRICE ACTION · M5</span>{(m5Intelligence?.price_action_events.slice(-3).reverse() ?? []).map(item => <div className="intel-row" key={item.event_id}><b>{label(item.event_type)}</b><strong>{label(item.direction)}</strong><small>{localTime(item.detected_at_utc, true)} LKT</small></div>)}</article>
+      </div>
       <div className="engine-external">{Object.values(engines?.external_engines ?? {}).map(engine => <StatusDot key={engine.engine_name} label={engine.engine_name} value={engine.status} />)}</div>
       <p className="muted-copy">Engine scores are analytical research signals only. V0.6 risk fusion and V0.8 shadow recording are unchanged.</p>
     </Panel>

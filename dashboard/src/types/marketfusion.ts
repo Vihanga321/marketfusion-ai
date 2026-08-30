@@ -233,5 +233,14 @@ export interface OperatorStatus {
   runtime_status?: string | null;
   mode: string;
 }
-export interface EngineOutput { engine_name: string; status: string; direction_score: number | null; confidence: number | null; regime: string | null; feature_count: number; input_freshness: string; reason_codes: string[]; components: Record<string, number | string | null> }
-export interface EngineStatus { contract_version: string; status: string; decision_timestamp_utc: string | null; engines: Record<string, EngineOutput>; external_engines: Record<string, EngineOutput>; observational_only: boolean; v06_integration: boolean }
+export interface EngineOutput { engine_name: string; status: string; direction_score: number | null; confidence: number | null; regime: string | null; feature_count: number; input_freshness: string; reason_codes: string[]; components: Record<string, unknown> }
+export interface EngineEvent { event_id: string; event_type: string; timeframe: string; detected_at_utc: string; status: string; direction?: string }
+export interface PatternRecord { pattern_id: string; pattern_type: string; timeframe: string; detected_at_utc: string; confirmed_at_utc: string | null; status: string; direction: string; score: number; confidence: number; upper_boundary: number | null; lower_boundary: number | null }
+export interface EngineLevel { level_id: string; kind: string; source: string; price: number; distance_price?: number; distance_atr?: number }
+export interface TimeframeIntelligence {
+  timeframe: string; latest_completed_bar_utc: string; structure_state: string; patterns: PatternRecord[];
+  structure_events: EngineEvent[]; price_action_events: EngineEvent[];
+  support_resistance: { nearest_support: EngineLevel | null; nearest_resistance: EngineLevel | null; dynamic: { name: string; price: number }[] };
+  liquidity: { sweeps: EngineEvent[]; fair_value_gaps: (EngineEvent & { lower_boundary: number; upper_boundary: number })[]; nearest_liquidity: Record<string, unknown> | null };
+}
+export interface EngineStatus { contract_version: string; status: string; decision_timestamp_utc: string | null; market_status?: string; data_freshness?: string; engines: Record<string, EngineOutput>; external_engines: Record<string, EngineOutput>; timeframes?: Record<string, TimeframeIntelligence>; recent_patterns?: PatternRecord[]; event_history?: EngineEvent[]; informational_agreement?: { status: string; conflict_resolution: string }; timeframe_availability?: Record<string, { status: string; reason?: string }>; not_implemented_features?: Record<string, { status: string; reason: string }>; observational_only: boolean; v06_integration: boolean; trading_enabled?: false }

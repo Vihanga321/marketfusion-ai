@@ -1,0 +1,14 @@
+MARKETFUSION V0.9A.1 ENGINE BENCHMARK
+
+method: perf_counter localhost read-only engine_status
+baseline: committed HEAD V0.9A feature-row engines
+candidate: bounded M5/M15/H1 V0.9A.1 with file-version cache
+
+baseline_mean_ms: 47.526
+baseline_median_ms: 44.962
+v09a1_cold_ms: 1025.580
+v09a1_warm_mean_ms: 43.297
+v09a1_warm_median_ms: 42.965
+analysis_window_bars: M5=600,M15=600,H1=400
+interpretation: cold analysis is heavier; cached dashboard refresh remains bounded
+trading_impact: NONE
