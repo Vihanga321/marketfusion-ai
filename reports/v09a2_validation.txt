@@ -1,9 +1,16 @@
 MARKETFUSION V0.9A.2 VALIDATION
 status: PASS
-contract_version: v0.9a2-historical-engine-evaluation-v1
+contract_version: v0.9a2-historical-engine-evaluation-v2
+V09A2_PRODUCTION_INTEGRATION: FALSE
 future_or_target_feature_columns: []
 causal_availability_violations: 0
+final_holdout_opened_once: true
+historical_sample_count: 100000
+live_sample_count: 2
+historical_live_merge_rows: 0
 production_retrain: false
 promotion: false
 trading: false
-runtime_seconds: 1293.645
+artifact_generation_runtime_seconds: 70.432
+full_model_matrix_runtime_seconds: 2600.314
+total_research_runtime_seconds: 2972.638

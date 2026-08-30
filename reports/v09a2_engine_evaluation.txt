@@ -1,32 +1,47 @@
 MARKETFUSION V0.9A.2 HISTORICAL ENGINE EVALUATION
 
-generated_at_utc: 2026-08-30T17:20:59.804633+00:00
-contract_version: v0.9a2-historical-engine-evaluation-v1
+generated_at_utc: 2026-08-30T21:58:54.465765+00:00
+contract_version: v0.9a2-historical-engine-evaluation-v2
 mode: RESEARCH_ONLY
+V09A2_PRODUCTION_INTEGRATION: FALSE
 production_model_changed: false
 v06_integration_changed: false
 trading_enabled: false
 model_promotion: disabled
 historical_live_separation: HISTORICAL_REPORTS_ONLY_NO_V08_LIVE_SCORE_MERGE
-feature_outcome_separation: engine_features.parquet contains no outcome/target/future columns; targets.parquet is separate
+HISTORICAL_SAMPLE_COUNT: 100000
+LIVE_SAMPLE_COUNT: 2
+feature_outcome_separation: engine_features.parquet contains base V0.5A and causal engine features but no outcome/target/future columns; targets.parquet is separate
 availability_rule: completed bars only; pivots publish after two right bars; events publish at detection/transition close
 pattern_lifecycle: DETECTED then later CONFIRMED/INVALIDATED/EXPIRED_FORMING; no future status is backfilled
 target_rule: exact unchanged V0.5C 15/60/240 minute cost-band classes
-validation_rule: expanding purged walk-forward; all imputation/scaling fitted on training folds only
-ablation_execution: RECOMPUTED_ALL_FIXED_FOLDS
+validation_rule: five expanding purged walk-forward selection folds; final chronological holdout opened exactly once after selection
+preprocessing_rule: all imputation and scaling fitted on training folds only
+final_holdout_start_utc: 2026-07-31 06:25:00+00:00
+final_holdout_end_utc: 2026-08-28 23:45:00+00:00
+final_holdout_rows_by_horizon: {"15": 4725, "60": 4687, "240": 4536}
+ablation_execution: REUSED_VALIDATED_DETERMINISTIC_RESULTS
 model_family: LOGISTIC_REGRESSION (V0.5C-compatible temporary research model)
-research_solver: newton-cholesky; C=0.3; tol=0.01; max_iter=100; fixed before final successful run
+research_solver: newton-cholesky; C=0.3; tol=0.01; max_iter=100; fixed before evaluation
+worker_count: 1
+logical_cpu_count: 12
+physical_cpu_count: UNAVAILABLE
+artifact_generation_peak_process_memory_mb: UNAVAILABLE
+full_run_observed_peak_working_set_mb: 1032.5
+full_model_matrix_runtime_seconds: 2600.314
+causal_replay_and_report_runtime_seconds: 372.324
+total_research_runtime_seconds: 2972.638
 external_engines: UNAVAILABLE_NOT_SYNTHESIZED
 H4: UNAVAILABLE_NOT_SYNTHESIZED
 sample_threshold: 100 (not lowered)
-fvg_lifecycle: OPEN/FILLED transitions replayed forward; unresolved gaps expire visibly after 240 bars
+fvg_lifecycle: OPEN/PARTIALLY_FILLED/FILLED transitions replayed forward; unresolved gaps expire visibly after 240 bars
 data_suitability: M5 suitable for exact 15/60/240 targets; M15/H1 suitable as causal context over overlap; H4 unavailable
 feature_rows: 100000
-feature_columns: 149
-event_rows: 418154
+feature_columns: 361
+event_rows: 406294
 target_rows: 92997
-ablation_rows: 27
-runtime_seconds: 1293.645
+ablation_rows: 30
+artifact_generation_runtime_seconds: 70.432
 
 DATA_COVERAGE
 timeframe=M5 | status=AVAILABLE | rows=100000 | start_utc=2025-04-25 09:40:00+00:00 | end_utc=2026-08-29 00:00:00+00:00 | duplicate_timestamps=0.0 | nonpositive_ohlc=0.0 | gaps_over_nominal=107.0 | gaps_under_24h=35.0 | weekend_or_long_gaps=72.0 | largest_gap_minutes=2945.0 | timezone=UTC
@@ -34,37 +49,78 @@ timeframe=M15 | status=AVAILABLE | rows=60000 | start_utc=2024-03-29 00:00:00+00
 timeframe=H1 | status=AVAILABLE | rows=30000 | start_utc=2021-11-02 07:00:00+00:00 | end_utc=2026-08-29 00:00:00+00:00 | duplicate_timestamps=0.0 | nonpositive_ohlc=0.0 | gaps_over_nominal=262.0 | gaps_under_24h=7.0 | weekend_or_long_gaps=255.0 | largest_gap_minutes=4380.0 | timezone=UTC
 timeframe=H4 | status=UNAVAILABLE | rows=0 | start_utc=NaT | end_utc=NaT | duplicate_timestamps=nan | nonpositive_ohlc=nan | gaps_over_nominal=nan | gaps_under_24h=nan | weekend_or_long_gaps=nan | largest_gap_minutes=nan | timezone=nan
 
+ENGINE_AVAILABILITY
+engine=TECHNICAL | timeframe=M5 | total_decision_rows=100000 | available=99996 | partial=3 | unavailable=1 | invalid=0 | availability_percentage=99.996 | status=PARTIAL
+engine=PRICE_ACTION | timeframe=M5 | total_decision_rows=100000 | available=99998 | partial=2 | unavailable=0 | invalid=0 | availability_percentage=99.998 | status=PARTIAL
+engine=CHART_PATTERNS | timeframe=M5 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=STRUCTURE | timeframe=M5 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=LIQUIDITY | timeframe=M5 | total_decision_rows=100000 | available=99313 | partial=687 | unavailable=0 | invalid=0 | availability_percentage=99.313 | status=PARTIAL
+engine=SUPPORT_RESISTANCE | timeframe=M5 | total_decision_rows=100000 | available=65281 | partial=34719 | unavailable=0 | invalid=0 | availability_percentage=65.281 | status=PARTIAL
+engine=VOLATILITY | timeframe=M5 | total_decision_rows=100000 | available=99969 | partial=31 | unavailable=0 | invalid=0 | availability_percentage=99.969 | status=PARTIAL
+engine=SESSION | timeframe=M5 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=REGIME | timeframe=M5 | total_decision_rows=100000 | available=99996 | partial=4 | unavailable=0 | invalid=0 | availability_percentage=99.996 | status=PARTIAL
+engine=TECHNICAL | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=PRICE_ACTION | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=CHART_PATTERNS | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=STRUCTURE | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=LIQUIDITY | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=SUPPORT_RESISTANCE | timeframe=M15 | total_decision_rows=100000 | available=65864 | partial=34136 | unavailable=0 | invalid=0 | availability_percentage=65.864 | status=PARTIAL
+engine=VOLATILITY | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=SESSION | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=REGIME | timeframe=M15 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=TECHNICAL | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=PRICE_ACTION | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=CHART_PATTERNS | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=STRUCTURE | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=LIQUIDITY | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=SUPPORT_RESISTANCE | timeframe=H1 | total_decision_rows=100000 | available=67050 | partial=32950 | unavailable=0 | invalid=0 | availability_percentage=67.05 | status=PARTIAL
+engine=VOLATILITY | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=SESSION | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=REGIME | timeframe=H1 | total_decision_rows=100000 | available=100000 | partial=0 | unavailable=0 | invalid=0 | availability_percentage=100.0 | status=AVAILABLE
+engine=TECHNICAL | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=PRICE_ACTION | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=CHART_PATTERNS | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=STRUCTURE | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=LIQUIDITY | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=SUPPORT_RESISTANCE | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=VOLATILITY | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=SESSION | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+engine=REGIME | timeframe=H4 | total_decision_rows=100000 | available=0 | partial=0 | unavailable=100000 | invalid=0 | availability_percentage=0.0 | status=UNAVAILABLE
+
 ABLATION_SUMMARY
-h=15 | BASELINE | BA=0.408172 | delta=0.000000 | logloss=1.021466 | grade=REFERENCE | cross_horizon=REFERENCE
-h=15 | +TECHNICAL | BA=0.402999 | delta=-0.005174 | logloss=1.025779 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=15 | +PRICE_ACTION | BA=0.410555 | delta=0.002382 | logloss=1.022288 | grade=WEAK | cross_horizon=WEAK
-h=15 | +PATTERNS | BA=0.400288 | delta=-0.007885 | logloss=1.022411 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=15 | +STRUCTURE | BA=0.409547 | delta=0.001374 | logloss=1.021177 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=15 | +LIQUIDITY | BA=0.408015 | delta=-0.000158 | logloss=1.019734 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=15 | +SUPPORT_RESISTANCE | BA=0.402366 | delta=-0.005806 | logloss=1.020811 | grade=NO_EVIDENCE | cross_horizon=WEAK
-h=15 | +REGIME | BA=0.409112 | delta=0.000939 | logloss=1.031022 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=15 | +ALL_V09 | BA=0.398687 | delta=-0.009486 | logloss=1.050993 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | BASELINE | BA=0.405942 | delta=0.000000 | logloss=1.022551 | grade=REFERENCE | cross_horizon=REFERENCE
-h=60 | +TECHNICAL | BA=0.414762 | delta=0.008820 | logloss=1.049027 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | +PRICE_ACTION | BA=0.413722 | delta=0.007780 | logloss=1.022215 | grade=NO_EVIDENCE | cross_horizon=WEAK
-h=60 | +PATTERNS | BA=0.407386 | delta=0.001444 | logloss=1.028114 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | +STRUCTURE | BA=0.407658 | delta=0.001716 | logloss=1.023784 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | +LIQUIDITY | BA=0.405491 | delta=-0.000451 | logloss=1.019833 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | +SUPPORT_RESISTANCE | BA=0.413400 | delta=0.007458 | logloss=1.024990 | grade=WEAK | cross_horizon=WEAK
-h=60 | +REGIME | BA=0.408236 | delta=0.002294 | logloss=1.014696 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=60 | +ALL_V09 | BA=0.391716 | delta=-0.014226 | logloss=1.063166 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | BASELINE | BA=0.419821 | delta=0.000000 | logloss=0.998273 | grade=REFERENCE | cross_horizon=REFERENCE
-h=240 | +TECHNICAL | BA=0.421549 | delta=0.001727 | logloss=1.024859 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | +PRICE_ACTION | BA=0.420420 | delta=0.000599 | logloss=0.998989 | grade=NO_EVIDENCE | cross_horizon=WEAK
-h=240 | +PATTERNS | BA=0.419797 | delta=-0.000024 | logloss=0.997796 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | +STRUCTURE | BA=0.405430 | delta=-0.014391 | logloss=1.005291 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | +LIQUIDITY | BA=0.413523 | delta=-0.006298 | logloss=1.005100 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | +SUPPORT_RESISTANCE | BA=0.420681 | delta=0.000860 | logloss=0.999935 | grade=NO_EVIDENCE | cross_horizon=WEAK
-h=240 | +REGIME | BA=0.411585 | delta=-0.008236 | logloss=0.989160 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
-h=240 | +ALL_V09 | BA=0.405411 | delta=-0.014410 | logloss=1.036804 | grade=NO_EVIDENCE | cross_horizon=NO_EVIDENCE
+h=15 | BASELINE | BA=0.423623 | selection_delta=0.000000 | holdout_BA=0.396741 | holdout_delta=0.000000 | grade=REFERENCE | cross_horizon=REFERENCE
+h=15 | +TECHNICAL | BA=0.420131 | selection_delta=-0.003492 | holdout_BA=0.398001 | holdout_delta=0.001260 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +PRICE_ACTION | BA=0.424545 | selection_delta=0.000922 | holdout_BA=0.393007 | holdout_delta=-0.003734 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +PATTERNS | BA=0.416254 | selection_delta=-0.007369 | holdout_BA=0.387838 | holdout_delta=-0.008903 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +STRUCTURE | BA=0.423353 | selection_delta=-0.000271 | holdout_BA=0.388979 | holdout_delta=-0.007762 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +LIQUIDITY | BA=0.418723 | selection_delta=-0.004900 | holdout_BA=0.383591 | holdout_delta=-0.013150 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +SUPPORT_RESISTANCE | BA=0.421606 | selection_delta=-0.002017 | holdout_BA=0.390721 | holdout_delta=-0.006019 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +VOLATILITY | BA=0.418431 | selection_delta=-0.005192 | holdout_BA=0.389734 | holdout_delta=-0.007007 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +REGIME | BA=0.422198 | selection_delta=-0.001425 | holdout_BA=0.406964 | holdout_delta=0.010223 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=15 | +ALL_V09 | BA=0.407282 | selection_delta=-0.016341 | holdout_BA=0.372321 | holdout_delta=-0.024420 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | BASELINE | BA=0.422024 | selection_delta=0.000000 | holdout_BA=0.363127 | holdout_delta=0.000000 | grade=REFERENCE | cross_horizon=REFERENCE
+h=60 | +TECHNICAL | BA=0.424564 | selection_delta=0.002540 | holdout_BA=0.376548 | holdout_delta=0.013422 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +PRICE_ACTION | BA=0.428917 | selection_delta=0.006893 | holdout_BA=0.357113 | holdout_delta=-0.006014 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +PATTERNS | BA=0.418119 | selection_delta=-0.003905 | holdout_BA=0.367223 | holdout_delta=0.004097 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +STRUCTURE | BA=0.425765 | selection_delta=0.003741 | holdout_BA=0.355225 | holdout_delta=-0.007902 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +LIQUIDITY | BA=0.417709 | selection_delta=-0.004315 | holdout_BA=0.367113 | holdout_delta=0.003986 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +SUPPORT_RESISTANCE | BA=0.416886 | selection_delta=-0.005137 | holdout_BA=0.366263 | holdout_delta=0.003136 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +VOLATILITY | BA=0.424053 | selection_delta=0.002029 | holdout_BA=0.374655 | holdout_delta=0.011529 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +REGIME | BA=0.413307 | selection_delta=-0.008716 | holdout_BA=0.360456 | holdout_delta=-0.002671 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=60 | +ALL_V09 | BA=0.388128 | selection_delta=-0.033896 | holdout_BA=0.386044 | holdout_delta=0.022918 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | BASELINE | BA=0.417922 | selection_delta=0.000000 | holdout_BA=0.382163 | holdout_delta=0.000000 | grade=REFERENCE | cross_horizon=REFERENCE
+h=240 | +TECHNICAL | BA=0.421596 | selection_delta=0.003675 | holdout_BA=0.388464 | holdout_delta=0.006301 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +PRICE_ACTION | BA=0.424085 | selection_delta=0.006163 | holdout_BA=0.373390 | holdout_delta=-0.008772 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +PATTERNS | BA=0.397777 | selection_delta=-0.020145 | holdout_BA=0.413789 | holdout_delta=0.031626 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +STRUCTURE | BA=0.402347 | selection_delta=-0.015575 | holdout_BA=0.388121 | holdout_delta=0.005958 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +LIQUIDITY | BA=0.410750 | selection_delta=-0.007172 | holdout_BA=0.391694 | holdout_delta=0.009532 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +SUPPORT_RESISTANCE | BA=0.411030 | selection_delta=-0.006892 | holdout_BA=0.386299 | holdout_delta=0.004136 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +VOLATILITY | BA=0.410595 | selection_delta=-0.007327 | holdout_BA=0.377592 | holdout_delta=-0.004570 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +REGIME | BA=0.407976 | selection_delta=-0.009945 | holdout_BA=0.379741 | holdout_delta=-0.002421 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
+h=240 | +ALL_V09 | BA=0.392083 | selection_delta=-0.025838 | holdout_BA=0.382573 | holdout_delta=0.000410 | grade=NO_MEANINGFUL_EVIDENCE | cross_horizon=NO_MEANINGFUL_EVIDENCE
 
 EVIDENCE_LIMITS
-sample_sufficient_event_groups: 1684
+sample_sufficient_event_groups: 3264
 Event grades use a conservative 4.5-standard-error simultaneous screen across predeclared comparisons.
 Chart/candle/event tables are conditional descriptive evidence; they are not causal effect estimates.
 No feature family is promoted here. V0.9B ensemble work is explicitly out of scope.

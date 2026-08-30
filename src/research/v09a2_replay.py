@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.engines.patterns import PATTERN_TYPES
+from src.marketdata.market_calendar import SESSION_SCHEDULES
 from src.marketdata.v05a_contract import CONTINUOUS_DIR, TIMEFRAMES
 from src.research.v09a2_contract import AVAILABLE_TIMEFRAMES, CONTRACT_VERSION
 
@@ -196,10 +197,15 @@ def replay_timeframe(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame,
     pivot_high=((h.shift(2)>h.shift(3))&(h.shift(2)>h.shift(4))&(h.shift(2)>h.shift(1))&(h.shift(2)>h)).fillna(False)
     pivot_low=((l.shift(2)<l.shift(3))&(l.shift(2)<l.shift(4))&(l.shift(2)<l.shift(1))&(l.shift(2)<l)).fillna(False)
     structure_state=np.zeros(len(bars)); swing_signal=np.zeros(len(bars)); bos=np.zeros(len(bars)); choch=np.zeros(len(bars))
+    structure_labels={name:np.zeros(len(bars)) for name in ("HH","HL","LH","LL")}
+    structure_regimes={name:np.zeros(len(bars)) for name in ("TREND_UP","TREND_DOWN","RANGE","TRANSITION")}
     pattern_values={name:np.zeros(len(bars)) for name in PATTERN_TYPES}; pattern_count=np.zeros(len(bars))
-    equal_high=np.zeros(len(bars)); equal_low=np.zeros(len(bars)); sweep=np.zeros(len(bars)); sr_support=np.full(len(bars),np.nan); sr_resistance=np.full(len(bars),np.nan)
-    alternating: list[tuple[str,float]]=[]; last_kind=None; same_kind:dict[str,float]={}; trend=0.0; eq_levels:list[tuple[str,float]]=[]
-    last_high=None; last_low=None; last_support_touch=-10_000; last_resistance_touch=-10_000
+    equal_high=np.zeros(len(bars)); equal_low=np.zeros(len(bars)); sweep=np.zeros(len(bars)); nearest_liquidity=np.full(len(bars),np.nan)
+    sr_support=np.full(len(bars),np.nan); sr_resistance=np.full(len(bars),np.nan); fib_distance=np.full(len(bars),np.nan)
+    support_break=np.zeros(len(bars)); resistance_break=np.zeros(len(bars)); support_touches=np.zeros(len(bars)); resistance_touches=np.zeros(len(bars))
+    alternating: list[tuple[str,float]]=[]; same_kind:dict[str,float]={}; trend=0.0; eq_levels:list[tuple[str,float]]=[]
+    recent_structure_labels:list[str]=[]; structural_regime="RANGE"
+    last_high=None; last_low=None; last_support_touch=-10_000; last_resistance_touch=-10_000; support_touch_total=0; resistance_touch_total=0
     for i in range(len(bars)):
         tolerance=max((atr.iloc[i] if pd.notna(atr.iloc[i]) else 0)*.25,c.iloc[i]*.00008)
         new: list[tuple[str,float]]=[]
@@ -209,6 +215,16 @@ def replay_timeframe(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame,
             prior_same=same_kind.get(kind); same_kind[kind]=price
             label=(1.0 if kind=="HIGH" else -1.0) if prior_same is None else np.sign(price-prior_same)
             swing_signal[i]=label
+            if prior_same is not None:
+                structure_label=("HH" if price>prior_same else "LH") if kind=="HIGH" else ("HL" if price>prior_same else "LL")
+                structure_labels[structure_label][i]=1.0
+                recent_structure_labels.append(structure_label); recent_structure_labels=recent_structure_labels[-8:]
+                _event(events,timeframe,"STRUCTURE",structure_label,bars.at[i,"bar_close_utc"],1 if structure_label in {"HH","HL"} else -1)
+                label_set=set(recent_structure_labels)
+                next_regime="TREND_UP" if {"HH","HL"}.issubset(label_set) and not label_set.intersection({"LH","LL"}) else "TREND_DOWN" if {"LH","LL"}.issubset(label_set) and not label_set.intersection({"HH","HL"}) else "TRANSITION" if label_set.intersection({"HH","HL"}) and label_set.intersection({"LH","LL"}) else "RANGE"
+                if next_regime!=structural_regime:
+                    structural_regime=next_regime
+                    _event(events,timeframe,"STRUCTURE",structural_regime,bars.at[i,"bar_close_utc"],1 if structural_regime=="TREND_UP" else -1 if structural_regime=="TREND_DOWN" else 0)
             if prior_same is not None and abs(price-prior_same)<=max(tolerance*.48,c.iloc[i]*.00004):
                 eq_levels.append((kind,(price+prior_same)/2)); equal_high[i if kind=="HIGH" else 0]+=1 if kind=="HIGH" else 0; equal_low[i if kind=="LOW" else 0]+=1 if kind=="LOW" else 0
                 _event(events,timeframe,"LIQUIDITY","EQUAL_HIGHS" if kind=="HIGH" else "EQUAL_LOWS",bars.at[i,"bar_close_utc"],-1 if kind=="HIGH" else 1)
@@ -227,24 +243,42 @@ def replay_timeframe(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame,
             else: last_low=price
         if i>0 and last_high is not None and c.iloc[i-1]<=last_high<c.iloc[i]:
             is_choch=trend<0; (choch if is_choch else bos)[i]=1; trend=1
-            _event(events,timeframe,"STRUCTURE","CHOCH" if is_choch else "BOS",bars.at[i,"bar_close_utc"],1)
+            _event(events,timeframe,"STRUCTURE","CHOCH_BULLISH" if is_choch else "BOS_BULLISH",bars.at[i,"bar_close_utc"],1)
+            resistance_break[i]=1; _event(events,timeframe,"SUPPORT_RESISTANCE","RESISTANCE_BREAK",bars.at[i,"bar_close_utc"],1)
         if i>0 and last_low is not None and c.iloc[i-1]>=last_low>c.iloc[i]:
             is_choch=trend>0; (choch if is_choch else bos)[i]=-1; trend=-1
-            _event(events,timeframe,"STRUCTURE","CHOCH" if is_choch else "BOS",bars.at[i,"bar_close_utc"],-1)
-        structure_state[i]=trend
+            _event(events,timeframe,"STRUCTURE","CHOCH_BEARISH" if is_choch else "BOS_BEARISH",bars.at[i,"bar_close_utc"],-1)
+            support_break[i]=-1; _event(events,timeframe,"SUPPORT_RESISTANCE","SUPPORT_BREAK",bars.at[i,"bar_close_utc"],-1)
+        structure_state[i]=1 if structural_regime=="TREND_UP" else -1 if structural_regime=="TREND_DOWN" else .5 if structural_regime=="TRANSITION" else 0
+        structure_regimes[structural_regime][i]=1
         for kind,price in eq_levels[-20:]:
-            if kind=="HIGH" and h.iloc[i]>price+tolerance and c.iloc[i]<price: sweep[i]-=1; _event(events,timeframe,"LIQUIDITY","BUY_SIDE_LIQUIDITY_SWEEP",bars.at[i,"bar_close_utc"],-1); eq_levels.remove((kind,price)); break
-            if kind=="LOW" and l.iloc[i]<price-tolerance and c.iloc[i]>price: sweep[i]+=1; _event(events,timeframe,"LIQUIDITY","SELL_SIDE_LIQUIDITY_SWEEP",bars.at[i,"bar_close_utc"],1); eq_levels.remove((kind,price)); break
+            if kind=="HIGH" and h.iloc[i]>price+tolerance and c.iloc[i]<price:
+                sweep[i]-=1
+                _event(events,timeframe,"LIQUIDITY","HIGH_SWEEP",bars.at[i,"bar_close_utc"],-1)
+                _event(events,timeframe,"LIQUIDITY","BEARISH_LIQUIDITY_SWEEP",bars.at[i,"bar_close_utc"],-1)
+                eq_levels.remove((kind,price)); break
+            if kind=="LOW" and l.iloc[i]<price-tolerance and c.iloc[i]>price:
+                sweep[i]+=1
+                _event(events,timeframe,"LIQUIDITY","LOW_SWEEP",bars.at[i,"bar_close_utc"],1)
+                _event(events,timeframe,"LIQUIDITY","BULLISH_LIQUIDITY_SWEEP",bars.at[i,"bar_close_utc"],1)
+                eq_levels.remove((kind,price)); break
+        if eq_levels: nearest_liquidity[i]=min(abs(c.iloc[i]-price) for _,price in eq_levels[-20:])/max(atr.iloc[i],1e-12)
         sr_support[i]=last_low if last_low is not None and last_low<=c.iloc[i] else np.nan
         sr_resistance[i]=last_high if last_high is not None and last_high>=c.iloc[i] else np.nan
         touch_tolerance=max(tolerance*.6,c.iloc[i]*.00004)
         if i-last_support_touch>2 and pd.notna(sr_support[i]) and l.iloc[i]<=sr_support[i]+touch_tolerance and c.iloc[i]>=sr_support[i]:
-            _event(events,timeframe,"SUPPORT_RESISTANCE","SUPPORT_TOUCH",bars.at[i,"bar_close_utc"],1); last_support_touch=i
+            support_touch_total+=1; _event(events,timeframe,"SUPPORT_RESISTANCE","SUPPORT_TOUCH",bars.at[i,"bar_close_utc"],1); last_support_touch=i
         if i-last_resistance_touch>2 and pd.notna(sr_resistance[i]) and h.iloc[i]>=sr_resistance[i]-touch_tolerance and c.iloc[i]<=sr_resistance[i]:
-            _event(events,timeframe,"SUPPORT_RESISTANCE","RESISTANCE_TOUCH",bars.at[i,"bar_close_utc"],-1); last_resistance_touch=i
+            resistance_touch_total+=1; _event(events,timeframe,"SUPPORT_RESISTANCE","RESISTANCE_TOUCH",bars.at[i,"bar_close_utc"],-1); last_resistance_touch=i
+        support_touches[i]=min(support_touch_total,10); resistance_touches[i]=min(resistance_touch_total,10)
+        if last_high is not None and last_low is not None and last_high!=last_low:
+            low_bound,high_bound=sorted((last_low,last_high)); fib_levels=[low_bound+(high_bound-low_bound)*ratio for ratio in (.236,.382,.5,.618,.786)]
+            fib_distance[i]=min(abs(c.iloc[i]-level) for level in fib_levels)/max(atr.iloc[i],1e-12)
     out[f"structure_{prefix}_state"]=structure_state
     out[f"structure_{prefix}_confirmed_swing"]=swing_signal
     out[f"structure_{prefix}_bos"]=bos; out[f"structure_{prefix}_choch"]=choch
+    for name,values in structure_labels.items(): out[f"structure_{prefix}_{name.lower()}"]=values
+    for name,values in structure_regimes.items(): out[f"structure_{prefix}_{name.lower()}"]=values
 
     # Continuation geometry is computed from the current and preceding 23 bars only.
     impulse=c.shift(16)-o.shift(23); imp_atr=impulse/atr.replace(0,np.nan)
@@ -270,10 +304,10 @@ def replay_timeframe(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame,
     bullish_fvg=(l>h.shift(2)); bearish_fvg=(h<l.shift(2)); fvg=bullish_fvg.astype(float)-bearish_fvg.astype(float)
     # A bounded 240-bar lifecycle prevents stale gaps from creating unbounded
     # replay work. Expiry is an observed state transition, never a retroactive fill.
-    open_gaps: list[tuple[int,float,float,float]]=[]; open_count=np.zeros(len(bars)); fill_signal=np.zeros(len(bars))
+    open_gaps: list[tuple[int,float,float,float,bool]]=[]; open_count=np.zeros(len(bars)); fill_signal=np.zeros(len(bars)); partial_fill=np.zeros(len(bars))
     for idx in range(len(bars)):
         still_open=[]
-        for born,direction,lower_bound,upper_bound in open_gaps:
+        for born,direction,lower_bound,upper_bound,was_partial in open_gaps:
             if idx-born>240:
                 _event(events,timeframe,"LIQUIDITY","FAIR_VALUE_GAP_EXPIRED",bars.at[idx,"bar_close_utc"],direction,status="EXPIRED_UNFILLED")
                 continue
@@ -281,34 +315,74 @@ def replay_timeframe(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame,
             if filled:
                 fill_signal[idx]+=direction
                 _event(events,timeframe,"LIQUIDITY","FAIR_VALUE_GAP_FILLED",bars.at[idx,"bar_close_utc"],direction)
-            else: still_open.append((born,direction,lower_bound,upper_bound))
+            else:
+                is_partial=(direction>0 and l.iloc[idx]<upper_bound) or (direction<0 and h.iloc[idx]>lower_bound)
+                if is_partial and not was_partial:
+                    partial_fill[idx]+=direction
+                    _event(events,timeframe,"LIQUIDITY","FAIR_VALUE_GAP_PARTIALLY_FILLED",bars.at[idx,"bar_close_utc"],direction,status="PARTIALLY_FILLED")
+                still_open.append((born,direction,lower_bound,upper_bound,was_partial or is_partial))
         open_gaps=still_open
         if bool(bullish_fvg.iloc[idx]):
-            open_gaps.append((idx,1.0,float(h.iloc[idx-2]),float(l.iloc[idx])))
+            open_gaps.append((idx,1.0,float(h.iloc[idx-2]),float(l.iloc[idx]),False))
         elif bool(bearish_fvg.iloc[idx]):
-            open_gaps.append((idx,-1.0,float(h.iloc[idx]),float(l.iloc[idx-2])))
+            open_gaps.append((idx,-1.0,float(h.iloc[idx]),float(l.iloc[idx-2]),False))
         if fvg.iloc[idx] != 0:
             size=abs((l.iloc[idx]-h.iloc[idx-2]) if fvg.iloc[idx]>0 else (l.iloc[idx-2]-h.iloc[idx]))
             _event(events,timeframe,"LIQUIDITY","FAIR_VALUE_GAP",bars.at[idx,"bar_close_utc"],float(fvg.iloc[idx]),min(1,float(size/max(atr.iloc[idx],1e-12))),"OPEN")
+            _event(events,timeframe,"LIQUIDITY","BULLISH_FVG" if fvg.iloc[idx]>0 else "BEARISH_FVG",
+                   bars.at[idx,"bar_close_utc"],float(fvg.iloc[idx]),min(1,float(size/max(atr.iloc[idx],1e-12))),"OPEN")
         open_count[idx]=len(open_gaps)
     out[f"liquidity_{prefix}_fvg_new"]=fvg
     out[f"liquidity_{prefix}_fvg_fill"]=fill_signal
+    out[f"liquidity_{prefix}_fvg_partial_fill"]=partial_fill
     out[f"liquidity_{prefix}_fvg_open_count"]=open_count
     out[f"liquidity_{prefix}_equal_high"]=equal_high; out[f"liquidity_{prefix}_equal_low"]=equal_low
     out[f"liquidity_{prefix}_sweep"]=sweep
+    out[f"liquidity_{prefix}_nearest_cluster_distance_atr"]=nearest_liquidity
     out[f"support_resistance_{prefix}_support_distance_atr"]=(c-sr_support)/atr.replace(0,np.nan)
     out[f"support_resistance_{prefix}_resistance_distance_atr"]=(sr_resistance-c)/atr.replace(0,np.nan)
     out[f"support_resistance_{prefix}_ema20_distance_atr"]=(c-ema20)/atr.replace(0,np.nan)
+    out[f"support_resistance_{prefix}_ema50_distance_atr"]=(c-ema50)/atr.replace(0,np.nan)
+    out[f"support_resistance_{prefix}_fib_nearest_distance_atr"]=fib_distance
+    out[f"support_resistance_{prefix}_support_touch_count"]=support_touches
+    out[f"support_resistance_{prefix}_resistance_touch_count"]=resistance_touches
+    out[f"support_resistance_{prefix}_support_break"]=support_break
+    out[f"support_resistance_{prefix}_resistance_break"]=resistance_break
     day=bars["bar_close_utc"].dt.floor("D")
     prev_day_high=h.groupby(day).transform("max").groupby(day).first().shift(1); prev_day_low=l.groupby(day).transform("min").groupby(day).first().shift(1)
     out[f"support_resistance_{prefix}_previous_day_high_distance_atr"]=(day.map(prev_day_high)-c)/atr.replace(0,np.nan)
     out[f"support_resistance_{prefix}_previous_day_low_distance_atr"]=(c-day.map(prev_day_low))/atr.replace(0,np.nan)
+    week=day-pd.to_timedelta(bars["bar_close_utc"].dt.dayofweek,unit="D")
+    week_high=h.groupby(week).max().shift(1); week_low=l.groupby(week).min().shift(1)
+    out[f"support_resistance_{prefix}_previous_week_high_distance_atr"]=(week.map(week_high)-c)/atr.replace(0,np.nan)
+    out[f"support_resistance_{prefix}_previous_week_low_distance_atr"]=(c-week.map(week_low))/atr.replace(0,np.nan)
     vol=atr/c; vol_rank=vol.rolling(288,min_periods=30).rank(pct=True)
+    out[f"volatility_{prefix}_atr_fraction"]=vol
+    out[f"volatility_{prefix}_rank"]=vol_rank
+    out[f"volatility_{prefix}_low"]=(vol_rank<=.20).astype(float)
+    out[f"volatility_{prefix}_normal"]=((vol_rank>.20)&(vol_rank<.80)).astype(float)
+    out[f"volatility_{prefix}_high"]=((vol_rank>=.80)&(vol_rank<.95)).astype(float)
+    out[f"volatility_{prefix}_extreme"]=(vol_rank>=.95).astype(float)
     out[f"regime_{prefix}_trend"]=np.sign(ema20-ema50)
-    out[f"regime_{prefix}_volatility_rank"]=vol_rank
     volume=pd.to_numeric(bars.get("tick_volume",pd.Series(0,index=bars.index)),errors="coerce")
     out[f"regime_{prefix}_volume_ratio"]=volume/volume.rolling(24,min_periods=5).mean().replace(0,np.nan)
     out[f"regime_{prefix}_range_flag"]=(out[f"technical_{prefix}_ema20_50_gap_atr"].abs()<.25).astype(float)
+    trend_code=out[f"regime_{prefix}_trend"]; range_flag=out[f"regime_{prefix}_range_flag"]
+    transition=trend_code.ne(trend_code.shift(1)).astype(float)
+    out[f"regime_{prefix}_transition"]=transition
+    out[f"regime_{prefix}_trending_up"]=((trend_code>0)&range_flag.eq(0)).astype(float)
+    out[f"regime_{prefix}_trending_down"]=((trend_code<0)&range_flag.eq(0)).astype(float)
+    out[f"regime_{prefix}_ranging"]=range_flag
+    out[f"market_regime_{prefix}"]=np.select([vol_rank>=.80,vol_rank<=.20,transition.eq(1),out[f"regime_{prefix}_trending_up"].eq(1),out[f"regime_{prefix}_trending_down"].eq(1)],
+        ["HIGH_VOLATILITY","LOW_VOLATILITY","TRANSITION","TRENDING_UP","TRENDING_DOWN"],default="RANGING")
+    times=bars["bar_close_utc"]
+    active_columns=[]
+    for session_name,zone,opens,closes in SESSION_SCHEDULES:
+        local=times.dt.tz_convert(zone); minutes=local.dt.hour*60+local.dt.minute
+        active=((local.dt.dayofweek<5)&minutes.ge(opens.hour*60+opens.minute)&minutes.lt(closes.hour*60+closes.minute)).astype(float)
+        column=f"session_{prefix}_{session_name.lower()}"; out[column]=active; active_columns.append(column)
+    out[f"session_{prefix}_overlap_count"]=out[active_columns].sum(axis=1)
+    out[f"session_{prefix}_day_of_week"]=times.dt.dayofweek.astype(float)
     return out, pd.DataFrame(events)
 
 
@@ -326,7 +400,29 @@ def build_replay(decisions: pd.Series, root: Path = CONTINUOUS_DIR) -> ReplayRes
     violations=sum(int((pd.to_datetime(merged[c],utc=True)>merged["decision_timestamp_utc"]).fillna(False).sum()) for c in availability)
     if violations: raise ValueError(f"Causal replay availability violations: {violations}")
     merged=merged.copy()
+    engine_prefixes={"technical":"technical_","price_action":"price_action_","chart_patterns":"pattern_",
+        "structure":"structure_","liquidity":"liquidity_","support_resistance":"support_resistance_",
+        "volatility":"volatility_","session":"session_","regime":"regime_"}
+    for timeframe in (*AVAILABLE_TIMEFRAMES,"H4"):
+        tf=timeframe.lower()
+        for engine,prefix in engine_prefixes.items():
+            columns=[name for name in merged if name.startswith(f"{prefix}{tf}_")]
+            if not columns:
+                merged[f"availability_{engine}_{tf}_missing_mask"]=1
+                merged[f"availability_{engine}_{tf}_partial_mask"]=0
+                continue
+            missing=merged[columns].isna()
+            merged[f"availability_{engine}_{tf}_missing_mask"]=missing.all(axis=1).astype("int8")
+            merged[f"availability_{engine}_{tf}_partial_mask"]=(missing.any(axis=1)&~missing.all(axis=1)).astype("int8")
     merged["contract_version"]=CONTRACT_VERSION
     audit=audit_bar_history(root)
     events=pd.concat(event_frames,ignore_index=True) if event_frames else pd.DataFrame()
+    if not events.empty:
+        start=decision_frame["decision_timestamp_utc"].min(); end=decision_frame["decision_timestamp_utc"].max()
+        detected=pd.to_datetime(events["detected_at_utc"],utc=True)
+        keep=detected.between(start,end,inclusive="both")
+        if "origin_detected_at_utc" in events:
+            origin=pd.to_datetime(events["origin_detected_at_utc"],utc=True,errors="coerce")
+            keep&=origin.isna()|origin.ge(start)
+        events=events.loc[keep].reset_index(drop=True)
     return ReplayResult(merged,events,audit)

@@ -16,8 +16,8 @@ from src.learning.v05c_contract import CLASS_LABELS
 from src.learning.v05c_models import evaluate_probabilities
 from src.learning.v05c_walk_forward import purged_walk_forward
 from src.research.v09a2_contract import (
-    ABLATION_SEQUENCE, CHART_PATTERNS, FEATURE_GROUPS, MIN_EVENT_SAMPLES,
-    MODEL_FAMILY, grade_evidence,
+    ABLATION_SEQUENCE, CHART_PATTERNS, FEATURE_GROUPS, FINAL_HOLDOUT_FRACTION,
+    MIN_EVENT_SAMPLES, MIN_FINAL_HOLDOUT_ROWS, MODEL_FAMILY, grade_evidence,
 )
 
 
@@ -63,10 +63,22 @@ def _ece(probability: np.ndarray, target: np.ndarray) -> float:
     return value
 
 
-def run_ablation(dataset: pd.DataFrame, horizon: int) -> pd.DataFrame:
-    """Use only expanding, purged V0.5C folds and train-fitted preprocessing."""
+def chronological_research_split(dataset: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Freeze the last chronological block before any model/ablation selection."""
     work = dataset.sort_values("decision_timestamp_utc").reset_index(drop=True)
-    folds = purged_walk_forward(work["decision_timestamp_utc"], horizon)
+    holdout_rows = max(MIN_FINAL_HOLDOUT_ROWS, int(len(work) * FINAL_HOLDOUT_FRACTION))
+    if holdout_rows >= len(work):
+        raise ValueError("Dataset is too small for selection plus final holdout")
+    split_at = len(work) - holdout_rows
+    return work.iloc[:split_at].reset_index(drop=True), work.iloc[split_at:].reset_index(drop=True)
+
+
+def run_ablation(dataset: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Purged selection folds followed by one untouched chronological holdout."""
+    work = dataset.sort_values("decision_timestamp_utc").reset_index(drop=True)
+    selection, holdout = chronological_research_split(work)
+    holdout_start=pd.Timestamp(holdout.iloc[0]["decision_timestamp_utc"])
+    folds = purged_walk_forward(selection["decision_timestamp_utc"], horizon)
     raw_rows: list[dict[str, Any]] = []
     for label in ABLATION_SEQUENCE:
         features = ablation_features(work, label)
@@ -75,7 +87,7 @@ def run_ablation(dataset: pd.DataFrame, horizon: int) -> pd.DataFrame:
         all_y: list[np.ndarray] = []; all_p: list[np.ndarray] = []; all_r: list[np.ndarray] = []; all_c: list[np.ndarray] = []
         fold_ba: list[float] = []
         for fold in folds:
-            train, valid = work.iloc[fold.train_indices], work.iloc[fold.validation_indices]
+            train, valid = selection.iloc[fold.train_indices], selection.iloc[fold.validation_indices]
             model = build_research_estimator()
             model.fit(train.loc[:, list(features)], train["target_class"].astype(int))
             probability = _aligned(model, valid.loc[:, list(features)])
@@ -85,31 +97,61 @@ def run_ablation(dataset: pd.DataFrame, horizon: int) -> pd.DataFrame:
             all_r.append(valid["raw_future_return"].to_numpy(float)); all_c.append(valid["decision_cost_band"].to_numpy(float))
         y=np.concatenate(all_y); probability=np.vstack(all_p); raw=np.concatenate(all_r); cost=np.concatenate(all_c)
         metrics=evaluate_probabilities(y,probability,raw,cost); predicted=np.asarray(CLASS_LABELS)[probability.argmax(axis=1)]
+        train_mask=(pd.to_datetime(selection["decision_timestamp_utc"],utc=True)+pd.Timedelta(minutes=horizon)).lt(holdout_start)
+        final_train=selection.loc[train_mask].reset_index(drop=True)
+        final_model=build_research_estimator(); final_model.fit(final_train.loc[:,list(features)],final_train["target_class"].astype(int))
+        holdout_probability=_aligned(final_model,holdout.loc[:,list(features)])
+        holdout_metrics=evaluate_probabilities(holdout["target_class"],holdout_probability,holdout["raw_future_return"],holdout["decision_cost_band"])
+        holdout_y=holdout["target_class"].to_numpy(int); holdout_predicted=np.asarray(CLASS_LABELS)[holdout_probability.argmax(axis=1)]
         row: dict[str,Any]={"horizon_minutes":horizon,"ablation":label,"model_family":MODEL_FAMILY,
             "feature_count":len(features),"validation_rows":len(y),"fold_count":len(folds),
             "accuracy":float(accuracy_score(y,predicted)),**metrics,
             "calibration_ece":_ece(probability,y),"fold_ba_mean":float(np.mean(fold_ba)),
             "fold_ba_std":float(np.std(fold_ba)),"fold_ba_worst":float(np.min(fold_ba)),
             "fold_ba_recent":float(fold_ba[-1]),"chronological_only":True,"purge_minutes":horizon,
-            "preprocessing_fit_scope":"TRAIN_ONLY"}
+            "preprocessing_fit_scope":"TRAIN_ONLY","selection_end_utc":selection["decision_timestamp_utc"].max(),
+            "holdout_start_utc":holdout["decision_timestamp_utc"].min(),"holdout_end_utc":holdout["decision_timestamp_utc"].max(),
+            "holdout_rows":len(holdout),"holdout_train_rows":len(final_train),"holdout_accuracy":float(accuracy_score(holdout_y,holdout_predicted)),
+            "holdout_calibration_ece":_ece(holdout_probability,holdout_y),"final_holdout_opened_once":True,
+            **{f"holdout_{key}":value for key,value in holdout_metrics.items()}}
         for class_id,name in ((0,"down"),(1,"neutral"),(2,"up")):
             row[f"precision_{name}"]=float(precision_score(y,predicted,labels=[class_id],average="macro",zero_division=0))
             row[f"recall_{name}"]=float(recall_score(y,predicted,labels=[class_id],average="macro",zero_division=0))
             row[f"f1_{name}"]=float(f1_score(y,predicted,labels=[class_id],average="macro",zero_division=0))
+            row[f"holdout_precision_{name}"]=float(precision_score(holdout_y,holdout_predicted,labels=[class_id],average="macro",zero_division=0))
+            row[f"holdout_recall_{name}"]=float(recall_score(holdout_y,holdout_predicted,labels=[class_id],average="macro",zero_division=0))
+            row[f"holdout_f1_{name}"]=float(f1_score(holdout_y,holdout_predicted,labels=[class_id],average="macro",zero_division=0))
         raw_rows.append(row)
     result=pd.DataFrame(raw_rows)
     if result.empty: return result
     base=float(result.loc[result["ablation"].eq("BASELINE"),"balanced_accuracy"].iloc[0])
     base_loss=float(result.loc[result["ablation"].eq("BASELINE"),"log_loss"].iloc[0])
+    base_f1=float(result.loc[result["ablation"].eq("BASELINE"),"macro_f1"].iloc[0]); base_brier=float(result.loc[result["ablation"].eq("BASELINE"),"brier"].iloc[0])
+    holdout_base=float(result.loc[result["ablation"].eq("BASELINE"),"holdout_balanced_accuracy"].iloc[0])
+    holdout_base_loss=float(result.loc[result["ablation"].eq("BASELINE"),"holdout_log_loss"].iloc[0])
     result["balanced_accuracy_delta_vs_baseline"]=result["balanced_accuracy"]-base
+    result["macro_f1_delta_vs_baseline"]=result["macro_f1"]-base_f1
     result["log_loss_delta_vs_baseline"]=result["log_loss"]-base_loss
+    result["brier_delta_vs_baseline"]=result["brier"]-base_brier
+    result["holdout_balanced_accuracy_delta_vs_baseline"]=result["holdout_balanced_accuracy"]-holdout_base
+    result["holdout_log_loss_delta_vs_baseline"]=result["holdout_log_loss"]-holdout_base_loss
     result["stability_pass"]=(result["fold_ba_recent"]>=result["fold_ba_mean"]-.03)&(result["fold_ba_worst"]>=base-.05)
-    result["evidence_grade"]=[grade_evidence(int(n),float(d),bool(s),float(loss)) for n,d,s,loss in zip(result["validation_rows"],result["balanced_accuracy_delta_vs_baseline"],result["stability_pass"],result["log_loss_delta_vs_baseline"])]
+    result["stability_pass"]&=result["holdout_balanced_accuracy"].ge(result["balanced_accuracy"]-.05)
+    grades=[]
+    for n,delta,holdout_delta,stable,loss,holdout_loss in zip(result["validation_rows"],result["balanced_accuracy_delta_vs_baseline"],result["holdout_balanced_accuracy_delta_vs_baseline"],result["stability_pass"],result["log_loss_delta_vs_baseline"],result["holdout_log_loss_delta_vs_baseline"]):
+        grade=grade_evidence(int(n),min(float(delta),float(holdout_delta)),bool(stable),max(float(loss),float(holdout_loss)))
+        grades.append(grade)
+    result["evidence_grade"]=grades
     result.loc[result["ablation"].eq("BASELINE"),"evidence_grade"]="REFERENCE"
     return result
 
 
 def _session(frame: pd.DataFrame) -> pd.Series:
+    canonical={name:f"session_m5_{name.lower()}" for name in ("SYDNEY","TOKYO","LONDON","NEW_YORK")}
+    if all(column in frame for column in canonical.values()):
+        syd=frame[canonical["SYDNEY"]].eq(1); tok=frame[canonical["TOKYO"]].eq(1); lon=frame[canonical["LONDON"]].eq(1); ny=frame[canonical["NEW_YORK"]].eq(1)
+        return pd.Series(np.select([lon&ny,syd&tok,tok&lon,syd,tok,lon,ny],
+            ["LONDON_NEW_YORK_OVERLAP","SYDNEY_TOKYO_OVERLAP","TOKYO_LONDON_OVERLAP","SYDNEY","TOKYO","LONDON","NEW_YORK"],default="INTERSESSION"),index=frame.index)
     return pd.Series(np.select([frame["is_london_ny_overlap"].eq(1),frame["is_london_session"].eq(1),frame["is_new_york_session"].eq(1),frame["is_asia_session"].eq(1)],
                                ["LONDON_NEW_YORK_OVERLAP","LONDON","NEW_YORK","ASIA"],default="OTHER"),index=frame.index)
 
@@ -121,15 +163,18 @@ def evaluate_events(events: pd.DataFrame, horizons: dict[int,pd.DataFrame]) -> p
     source=events.copy(); source["detected_at_utc"]=pd.to_datetime(source["detected_at_utc"],utc=True)
     for horizon,target in horizons.items():
         fields=["decision_timestamp_utc","target_class","raw_future_return","is_asia_session","is_london_session","is_new_york_session","is_london_ny_overlap"]
-        if "regime_m5_volatility_rank" in target:
-            fields.append("regime_m5_volatility_rank")
+        fields.extend(name for name in target if name.startswith("session_m5_") or name in {"volatility_m5_rank","market_regime_m5"})
         joined=source.merge(target[fields],left_on="detected_at_utc",right_on="decision_timestamp_utc",how="inner")
         if joined.empty: continue
         joined["session"]=_session(joined); joined["expected_class"]=np.where(joined["direction"]>0,2,np.where(joined["direction"]<0,0,1))
-        if "regime_m5_volatility_rank" in joined:
-            joined["regime"]=pd.cut(joined["regime_m5_volatility_rank"],[-np.inf,.33,.67,np.inf],labels=["LOW_VOLATILITY","NORMAL_VOLATILITY","HIGH_VOLATILITY"])
+        joined["day_of_week"]=joined["detected_at_utc"].dt.day_name()
+        if "market_regime_m5" in joined:
+            joined["regime"]=joined["market_regime_m5"]
+        elif "volatility_m5_rank" in joined:
+            joined["regime"]=pd.cut(joined["volatility_m5_rank"],[-np.inf,.33,.67,np.inf],labels=["LOW_VOLATILITY","NORMAL_VOLATILITY","HIGH_VOLATILITY"])
         specifications=[("ALL",["event_family","event_name","timeframe"]),("SESSION",["event_family","event_name","timeframe","session"])]
         if "regime" in joined: specifications.append(("REGIME",["event_family","event_name","timeframe","regime"]))
+        specifications.append(("DAY_OF_WEEK",["event_family","event_name","timeframe","day_of_week"]))
         class_rate=joined["target_class"].value_counts(normalize=True).reindex(CLASS_LABELS,fill_value=0.0)
         specifications=[(label,[*keys,"status"]) for label,keys in specifications]
         for subgroup,keys in specifications:
@@ -142,13 +187,13 @@ def evaluate_events(events: pd.DataFrame, horizons: dict[int,pd.DataFrame]) -> p
                 # 4.5 standard errors is deliberately conservative for the large,
                 # predeclared family of event/session/regime comparisons.
                 delta=accuracy-baseline; lower=delta-4.5*standard_error
-                if not sufficient: evidence="INSUFFICIENT_DATA"
-                elif subgroup=="ALL" and count>=500 and lower>0 and delta>=.05: evidence="STRONG"
-                elif subgroup=="ALL" and count>=300 and lower>0 and delta>=.03: evidence="MODERATE"
-                elif lower>0 and delta>=.02: evidence="WEAK"
-                else: evidence="NO_EVIDENCE"
+                if not sufficient: evidence="INSUFFICIENT_SAMPLE"
+                elif subgroup=="ALL" and count>=500 and lower>0 and delta>=.05: evidence="STRONG_EVIDENCE"
+                elif subgroup=="ALL" and count>=300 and lower>0 and delta>=.03: evidence="MODERATE_EVIDENCE"
+                elif lower>0 and delta>=.02: evidence="WEAK_EVIDENCE"
+                else: evidence="NO_MEANINGFUL_EVIDENCE"
                 record.update({"subgroup":subgroup,"horizon_minutes":horizon,"sample_count":count,
-                    "sample_status":"SUFFICIENT_DESCRIPTIVE_SAMPLE" if sufficient else "INSUFFICIENT_DATA",
+                    "sample_status":"SUFFICIENT_SAMPLE" if sufficient else "INSUFFICIENT_SAMPLE",
                     "directional_accuracy":accuracy if sufficient else np.nan,
                     "baseline_direction_rate":baseline if sufficient else np.nan,
                     "directional_accuracy_delta":delta if sufficient else np.nan,
@@ -167,7 +212,7 @@ def evaluate_events(events: pd.DataFrame, horizons: dict[int,pd.DataFrame]) -> p
     for name in CHART_PATTERNS:
         if name not in existing:
             for horizon in horizons:
-                missing.append({"event_family":"CHART_PATTERN","event_name":name,"timeframe":"ALL","subgroup":"ALL","status":"DETECTED","horizon_minutes":horizon,"sample_count":0,"sample_status":"INSUFFICIENT_DATA","claim":"NO_DETECTIONS_NO_EDGE_CLAIM"})
+                missing.append({"event_family":"CHART_PATTERN","event_name":name,"timeframe":"ALL","subgroup":"ALL","status":"DETECTED","horizon_minutes":horizon,"sample_count":0,"sample_status":"INSUFFICIENT_SAMPLE","evidence_grade":"INSUFFICIENT_SAMPLE","claim":"NO_DETECTIONS_NO_EDGE_CLAIM"})
     return pd.concat([result,pd.DataFrame(missing)],ignore_index=True,sort=False)
 
 
@@ -179,6 +224,8 @@ def engine_leaderboard(features: pd.DataFrame, horizons: dict[int,pd.DataFrame])
         "STRUCTURE":lambda x: x.filter(regex=r"^structure_.*(state|bos|choch)$").mean(axis=1),
         "LIQUIDITY":lambda x: x.filter(regex=r"^liquidity_.*(fvg_new|sweep)$").mean(axis=1),
         "SUPPORT_RESISTANCE":lambda x: -x.filter(regex=r"^support_resistance_.*(support|resistance)_distance_atr$").mean(axis=1),
+        "VOLATILITY":lambda x: x.filter(regex=r"^volatility_.*rank$").mean(axis=1)-.5,
+        "SESSION":lambda x: x.filter(regex=r"^session_m5_(sydney|tokyo|london|new_york)$").sum(axis=1),
         "REGIME":lambda x: x.filter(regex=r"^regime_.*trend$").mean(axis=1),
     }
     rows=[]
@@ -186,7 +233,7 @@ def engine_leaderboard(features: pd.DataFrame, horizons: dict[int,pd.DataFrame])
         base_fields=["decision_timestamp_utc","target_class","raw_future_return","is_asia_session","is_london_session","is_new_york_session","is_london_ny_overlap"]
         joined=target[base_fields].merge(features,on="decision_timestamp_utc",how="inner")
         joined["session"]=_session(joined)
-        joined["regime"]=pd.cut(joined.get("regime_m5_volatility_rank",pd.Series(.5,index=joined.index)),[-np.inf,.33,.67,np.inf],labels=["LOW_VOLATILITY","NORMAL_VOLATILITY","HIGH_VOLATILITY"])
+        joined["regime"]=joined.get("market_regime_m5",pd.Series("RANGING",index=joined.index))
         for engine,builder in specifications.items():
             joined["_signal"]=builder(joined).replace([np.inf,-np.inf],np.nan).fillna(0)
             slices=[("ALL","ALL",joined)]
@@ -194,16 +241,21 @@ def engine_leaderboard(features: pd.DataFrame, horizons: dict[int,pd.DataFrame])
             slices.extend(("REGIME",str(name),group) for name,group in joined.groupby("regime",observed=True))
             for subgroup_type,subgroup_value,group in slices:
                 signal=group["_signal"]; acted=signal.ne(0); count=int(acted.sum()); predicted=np.where(signal>0,2,np.where(signal<0,0,1)); sufficient=count>=MIN_EVENT_SAMPLES
+                directional=engine not in {"VOLATILITY","SESSION"}
                 ba=float(np.mean([np.mean(predicted[group["target_class"].eq(k)]==k) for k in CLASS_LABELS if group["target_class"].eq(k).any()])) if sufficient else np.nan
                 chronological=[]
                 for section in np.array_split(np.arange(len(group)),3):
                     part=group.iloc[section]; part_signal=part["_signal"]; part_pred=np.where(part_signal>0,2,np.where(part_signal<0,0,1))
                     chronological.append(float(np.mean([np.mean(part_pred[part["target_class"].eq(k)]==k) for k in CLASS_LABELS if part["target_class"].eq(k).any()])))
                 stable=bool(max(chronological)-min(chronological)<=.08)
-                grade="INSUFFICIENT_DATA" if not sufficient else "MODERATE" if ba>=.36 and stable else "WEAK" if ba>=.345 and stable else "NO_EVIDENCE"
+                grade="INSUFFICIENT_SAMPLE" if not sufficient else "MODERATE_EVIDENCE" if ba>=.36 and stable else "WEAK_EVIDENCE" if ba>=.345 and stable else "NO_MEANINGFUL_EVIDENCE"
                 rows.append({"engine":engine,"horizon_minutes":horizon,"subgroup_type":subgroup_type,"subgroup_value":subgroup_value,"rows":len(group),"acted_rows":count,
-                    "coverage":float(acted.mean()),"sample_status":"SUFFICIENT_DESCRIPTIVE_SAMPLE" if sufficient else "INSUFFICIENT_DATA",
-                    "directional_accuracy_acted":float((predicted[acted]==group.loc[acted,"target_class"]).mean()) if sufficient else np.nan,
+                    "coverage":float(acted.mean()),"sample_status":"SUFFICIENT_SAMPLE" if sufficient else "INSUFFICIENT_SAMPLE",
+                    "mean_score":float(signal.mean()),"future_return_correlation":float(signal.corr(group["raw_future_return"])) if signal.nunique()>1 else np.nan,
+                    "directional":directional,"directional_accuracy_acted":float((predicted[acted]==group.loc[acted,"target_class"]).mean()) if sufficient and directional else np.nan,
+                    "up_agreement":float((predicted[group["target_class"].eq(2)]==2).mean()) if sufficient and directional else np.nan,
+                    "down_agreement":float((predicted[group["target_class"].eq(0)]==0).mean()) if sufficient and directional else np.nan,
+                    "neutral_agreement":float((predicted[group["target_class"].eq(1)]==1).mean()) if sufficient and directional else np.nan,
                     "balanced_accuracy":ba,"chronological_third_ba_std":float(np.std(chronological)),"stability_pass":stable,
                     "mean_signed_return_acted":float(np.mean(np.sign(signal[acted])*group.loc[acted,"raw_future_return"])) if sufficient else np.nan,
                     "evidence_grade":grade,"standalone":True})
@@ -217,14 +269,115 @@ def redundancy_analysis(features: pd.DataFrame, target: pd.DataFrame) -> pd.Data
     sample=numeric.tail(min(20_000,len(numeric)))
     corr=sample.corr(method="spearman",min_periods=100)
     rows=[]
+    strongest: dict[str,tuple[str,float]]={}
     for i,left in enumerate(corr.columns):
         for right in corr.columns[i+1:]:
             value=corr.at[left,right]
+            if pd.notna(value):
+                if left not in strongest or abs(value)>abs(strongest[left][1]): strongest[left]=(right,float(value))
+                if right not in strongest or abs(value)>abs(strongest[right][1]): strongest[right]=(left,float(value))
             if pd.notna(value) and abs(value)>=.75:
-                rows.append({"analysis":"SPEARMAN_PAIR","feature":left,"related_feature":right,"value":float(value),"interpretation":"HIGH_REDUNDANCY" if abs(value)>=.90 else "MODERATE_REDUNDANCY"})
+                rows.append({"analysis":"SPEARMAN_PAIR","feature":left,"related_feature":right,"correlation":float(value),"value":float(value),
+                    "availability_percentage":float(sample[left].notna().mean()*100),"variance":float(sample[left].var()),
+                    "recommendation":"REVIEW_REDUNDANT","interpretation":"HIGH_REDUNDANCY" if abs(value)>=.90 else "MODERATE_REDUNDANCY"})
+    for name in numeric.columns:
+        variance=float(sample[name].var()) if sample[name].notna().any() else np.nan
+        related,value=strongest.get(name,(None,np.nan))
+        recommendation="DROP_CANDIDATE" if pd.notna(variance) and variance<=1e-12 else "REVIEW_REDUNDANT" if pd.notna(value) and abs(value)>=.98 else "KEEP_CANDIDATE"
+        rows.append({"analysis":"FEATURE_SUMMARY","feature":name,"related_feature":related,"correlation":value,"value":variance,
+            "availability_percentage":float(sample[name].notna().mean()*100),"variance":variance,"recommendation":recommendation,
+            "interpretation":"FEATURE_VARIANCE_AVAILABILITY_AND_MAX_CORRELATION"})
     joined=target[["decision_timestamp_utc","target_class"]].merge(features[["decision_timestamp_utc",*numeric.columns]],on="decision_timestamp_utc",how="inner").tail(20_000)
     x=joined[numeric.columns].replace([np.inf,-np.inf],np.nan).fillna(joined[numeric.columns].median()).fillna(0)
     if len(joined)>=MIN_EVENT_SAMPLES and len(x.columns):
         mi=mutual_info_classif(x,joined["target_class"].astype(int),discrete_features=False,random_state=1705)
-        rows.extend({"analysis":"MUTUAL_INFORMATION_15M","feature":name,"related_feature":"target_class","value":float(value),"interpretation":"UNIVARIATE_ASSOCIATION_NOT_CAUSAL_IMPORTANCE"} for name,value in zip(x.columns,mi))
+        rows.extend({"analysis":"MUTUAL_INFORMATION_15M","feature":name,"related_feature":"target_class","correlation":np.nan,"value":float(value),
+            "availability_percentage":float(numeric[name].notna().mean()*100),"variance":float(numeric[name].var()),"recommendation":"REVIEW_ONLY",
+            "interpretation":"UNIVARIATE_ASSOCIATION_NOT_CAUSAL_IMPORTANCE"} for name,value in zip(x.columns,mi))
     return pd.DataFrame(rows).sort_values(["analysis","value"],ascending=[True,False]) if rows else pd.DataFrame(columns=["analysis","feature","related_feature","value","interpretation"])
+
+
+def engine_availability(features: pd.DataFrame) -> pd.DataFrame:
+    engines={"TECHNICAL":"technical_","PRICE_ACTION":"price_action_","CHART_PATTERNS":"pattern_","STRUCTURE":"structure_",
+        "LIQUIDITY":"liquidity_","SUPPORT_RESISTANCE":"support_resistance_","VOLATILITY":"volatility_","SESSION":"session_","REGIME":"regime_"}
+    rows=[]; total=len(features)
+    for timeframe in ("M5","M15","H1","H4"):
+        tf=timeframe.lower()
+        for engine,prefix in engines.items():
+            missing_column=f"availability_{engine.lower()}_{tf}_missing_mask"; partial_column=f"availability_{engine.lower()}_{tf}_partial_mask"
+            unavailable=int(features.get(missing_column,pd.Series(1,index=features.index)).eq(1).sum())
+            partial=int(features.get(partial_column,pd.Series(0,index=features.index)).eq(1).sum())
+            columns=[name for name in features if name.startswith(f"{prefix}{tf}_") and pd.api.types.is_numeric_dtype(features[name])]
+            invalid=int(features[columns].isin([np.inf,-np.inf]).any(axis=1).sum()) if columns else 0
+            available=max(0,total-unavailable-partial-invalid)
+            rows.append({"engine":engine,"timeframe":timeframe,"total_decision_rows":total,"available":available,"partial":partial,
+                "unavailable":unavailable,"invalid":invalid,"availability_percentage":100.0*available/total if total else 0.0,
+                "status":"UNAVAILABLE" if available==0 and partial==0 else "PARTIAL" if partial or unavailable or invalid else "AVAILABLE"})
+    return pd.DataFrame(rows)
+
+
+def pattern_leaderboard(events: pd.DataFrame, evaluation: pd.DataFrame) -> pd.DataFrame:
+    strength={"STRONG_EVIDENCE":4,"MODERATE_EVIDENCE":3,"WEAK_EVIDENCE":2,"NO_MEANINGFUL_EVIDENCE":1,"INSUFFICIENT_SAMPLE":0}
+    pattern_events=(events.loc[events["event_family"].eq("CHART_PATTERN")]
+                    if "event_family" in events else pd.DataFrame(columns=["event_name","status"]))
+    rows=[]
+    for pattern in CHART_PATTERNS:
+        raw=pattern_events.loc[pattern_events["event_name"].eq(pattern)]
+        all_rows=(evaluation.loc[evaluation["event_family"].eq("CHART_PATTERN")&evaluation["event_name"].eq(pattern)&evaluation["subgroup"].eq("ALL")&evaluation["status"].eq("DETECTED")]
+                  if not evaluation.empty else pd.DataFrame(columns=["horizon_minutes","evidence_grade","sample_count"]))
+        detected=int(raw["status"].eq("DETECTED").sum()); confirmed=int(raw["status"].eq("CONFIRMED").sum())
+        invalidated=int(raw["status"].eq("INVALIDATED").sum()); expired=int(raw["status"].eq("EXPIRED_FORMING").sum())
+        record={"pattern":pattern,"sample_count":detected,"detected_count":detected,
+            "forming_count":max(0,detected-confirmed-invalidated-expired),"confirmed_count":confirmed,
+            "invalidated_count":invalidated,"expired_forming_count":expired}
+        grades=[]
+        for horizon in (15,60,240):
+            horizon_rows=all_rows.loc[all_rows["horizon_minutes"].eq(horizon)]
+            grade=max(horizon_rows.get("evidence_grade",pd.Series(dtype=str)),key=lambda value:strength.get(value,-1),default="INSUFFICIENT_SAMPLE")
+            record[f"{horizon}m_evidence"]=grade; record[f"{horizon}m_samples"]=int(horizon_rows["sample_count"].sum()) if not horizon_rows.empty else 0; grades.append(grade)
+        conditional=(evaluation.loc[evaluation["event_family"].eq("CHART_PATTERN")&evaluation["event_name"].eq(pattern)&evaluation["evidence_grade"].isin(["STRONG_EVIDENCE","MODERATE_EVIDENCE","WEAK_EVIDENCE"])]
+                     if not evaluation.empty else pd.DataFrame())
+        session_best=(conditional.loc[conditional["subgroup"].eq("SESSION")].sort_values("directional_accuracy_delta",ascending=False).head(1)
+                      if not conditional.empty else conditional)
+        regime_best=(conditional.loc[conditional["subgroup"].eq("REGIME")].sort_values("directional_accuracy_delta",ascending=False).head(1)
+                     if not conditional.empty else conditional)
+        record["best_session"]=session_best["session"].iloc[0] if not session_best.empty else None
+        record["best_regime"]=regime_best["regime"].iloc[0] if not regime_best.empty else None
+        best_strength=max(strength.get(value,0) for value in grades)
+        record["stability"]="CONSISTENT" if len(set(grades))==1 else "HORIZON_DEPENDENT"
+        record["recommendation"]="KEEP" if best_strength>=4 else "REVIEW" if best_strength>=2 else "HOLD" if best_strength==1 else "INSUFFICIENT_SAMPLE"
+        rows.append(record)
+    return pd.DataFrame(rows).sort_values(["recommendation","sample_count"],ascending=[True,False]).reset_index(drop=True)
+
+
+def engine_leaderboard_summary(ablation: pd.DataFrame, availability: pd.DataFrame, redundancy: pd.DataFrame) -> pd.DataFrame:
+    mappings={"TECHNICAL":"+TECHNICAL","PRICE_ACTION":"+PRICE_ACTION","CHART_PATTERNS":"+PATTERNS","STRUCTURE":"+STRUCTURE",
+        "LIQUIDITY":"+LIQUIDITY","SUPPORT_RESISTANCE":"+SUPPORT_RESISTANCE","VOLATILITY":"+VOLATILITY","REGIME":"+REGIME"}
+    strength={"STRONG_EVIDENCE":4,"MODERATE_EVIDENCE":3,"WEAK_EVIDENCE":2,"NO_MEANINGFUL_EVIDENCE":1,"INSUFFICIENT_SAMPLE":0,"REFERENCE":0}
+    rows=[]
+    for engine in (*mappings,"SESSION"):
+        experiment=mappings.get(engine)
+        selected=(ablation.loc[ablation["ablation"].eq(experiment)]
+                  if experiment else ablation.iloc[0:0].copy())
+        row={"engine":engine}
+        grades=[]
+        for horizon in (15,60,240):
+            item=selected.loc[selected["horizon_minutes"].eq(horizon)]
+            grade=item["evidence_grade"].iloc[0] if not item.empty else "NO_SEPARATE_ABLATION_BASELINE_CONTEXT"
+            row[f"{horizon}m_samples"]=int(item["validation_rows"].iloc[0]+item["holdout_rows"].iloc[0]) if not item.empty else 0
+            row[f"{horizon}m_evidence"]=grade
+            if grade in strength: grades.append(grade)
+        row["stability"]="PASS" if not selected.empty and bool(selected["stability_pass"].all()) else "NOT_ESTABLISHED"
+        group_name={"CHART_PATTERNS":"PATTERNS"}.get(engine,engine)
+        prefix=FEATURE_GROUPS.get(group_name,(engine.lower()+"_",))[0]
+        redundant=redundancy.loc[redundancy["analysis"].eq("FEATURE_SUMMARY")&redundancy["feature"].str.startswith(prefix,na=False)&redundancy["recommendation"].eq("REVIEW_REDUNDANT")]
+        row["redundancy"]="HIGH" if not redundant.empty else "LOW_OR_MODERATE"
+        available=availability.loc[availability["engine"].eq(engine)]
+        row["availability_percentage"]=float(available.loc[available["timeframe"].isin(["M5","M15","H1"]),"availability_percentage"].mean()) if not available.empty else np.nan
+        best=max((strength.get(value,0) for value in grades),default=0)
+        row["recommendation"]=("HOLD" if engine=="SESSION" else "KEEP" if best>=4 else "REVIEW" if best>=2
+            else "DROP_CANDIDATE" if best<=1 and row["redundancy"]=="HIGH" else "HOLD")
+        row["rank_score"]=0 if engine=="SESSION" else best-(.25 if row["redundancy"]=="HIGH" else 0)
+        rows.append(row)
+    result=pd.DataFrame(rows).sort_values(["rank_score","engine"],ascending=[False,True]).reset_index(drop=True)
+    result.insert(0,"rank",np.arange(1,len(result)+1)); return result
