@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('EURUSD','XAUUSD')][string]$Symbol = 'EURUSD',
     [ValidateRange(1, 65535)][int]$Port = 8765,
     [ValidateRange(1, 65535)][int]$DashboardPort = 4173
 )
@@ -8,7 +9,10 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Python = Join-Path $Root 'venv\Scripts\python.exe'
 $HadDashboardPortEnvironment = Test-Path Env:\MARKETFUSION_DASHBOARD_PORT
 $PreviousDashboardPortEnvironment = $env:MARKETFUSION_DASHBOARD_PORT
+$HadSymbolEnvironment = Test-Path Env:\MARKETFUSION_ACTIVE_SYMBOL
+$PreviousSymbolEnvironment = $env:MARKETFUSION_ACTIVE_SYMBOL
 $env:MARKETFUSION_DASHBOARD_PORT = [string]$DashboardPort
+$env:MARKETFUSION_ACTIVE_SYMBOL = $Symbol
 Push-Location $Root
 try {
     if (-not (Test-Path -LiteralPath $Python)) { throw "Missing virtual-environment Python: $Python" }
@@ -19,5 +23,7 @@ try {
 } finally {
     if ($HadDashboardPortEnvironment) { $env:MARKETFUSION_DASHBOARD_PORT = $PreviousDashboardPortEnvironment }
     else { Remove-Item Env:\MARKETFUSION_DASHBOARD_PORT -ErrorAction SilentlyContinue }
+    if ($HadSymbolEnvironment) { $env:MARKETFUSION_ACTIVE_SYMBOL = $PreviousSymbolEnvironment }
+    else { Remove-Item Env:\MARKETFUSION_ACTIVE_SYMBOL -ErrorAction SilentlyContinue }
     Pop-Location
 }

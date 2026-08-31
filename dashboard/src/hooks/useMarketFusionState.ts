@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchState } from "../api/client";
+import type { AssetId } from "../api/client";
 import type { ConnectionState, MarketFusionState } from "../types/marketfusion";
 
-export function useMarketFusionState(intervalMs = 3000) {
+export function useMarketFusionState(symbol: AssetId = "EURUSD", intervalMs = 3000) {
   const [state, setState] = useState<MarketFusionState | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("CONNECTING");
   const [lastSuccess, setLastSuccess] = useState<Date | null>(null);
@@ -16,7 +17,7 @@ export function useMarketFusionState(intervalMs = 3000) {
       inFlight.current = true;
       controller = new AbortController();
       try {
-        const { data, response } = await fetchState(controller.signal);
+        const { data, response } = await fetchState(controller.signal, symbol);
         if (!active) return;
         setState(data);
         setConnection(response.headers.get("X-MarketFusion-State-Freshness") === "FRESH" ? "LIVE" : "STALE");
@@ -30,6 +31,6 @@ export function useMarketFusionState(intervalMs = 3000) {
     void poll();
     const timer = window.setInterval(() => void poll(), intervalMs);
     return () => { active = false; controller?.abort(); window.clearInterval(timer); inFlight.current = false; };
-  }, [intervalMs]);
+  }, [intervalMs, symbol]);
   return { state, connection, lastSuccess };
 }

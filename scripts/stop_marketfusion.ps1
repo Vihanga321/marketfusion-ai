@@ -9,6 +9,11 @@ $Allowed = @{
     'v07_api' = 'src.dashboard.v07_api'
     'v07_dashboard' = 'vite/bin/vite.js'
     'v08_monitor' = 'src.evaluation.v08_runner'
+    'v10a_xauusd_state' = 'src.runtime.v10a_asset_state'
+    'realtime_quote_EURUSD' = 'src.marketdata.realtime_quote'
+    'realtime_quote_XAUUSD' = 'src.marketdata.realtime_quote'
+    'v10a_xauusd_market' = 'src.marketdata.v10a_asset'
+    'v10a_xauusd_shadow' = 'src.evaluation.v10a_asset_recorder'
 }
 if (-not (Test-Path -LiteralPath $PidRoot)) { Write-Host 'No MarketFusion V0.7 PID directory exists. Nothing to stop.'; exit 0 }
 foreach ($Name in $Allowed.Keys) {

@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('EURUSD','XAUUSD')][string]$Symbol = 'EURUSD',
     [switch]$SkipRuntime,
     [switch]$NoBrowser,
     [ValidateRange(1, 65535)][int]$DashboardPort = 4173
@@ -142,7 +143,13 @@ function Test-LegacyMarketFusionProcess {
 Push-Location $Root
 $HadDashboardPortEnvironment = Test-Path Env:\MARKETFUSION_DASHBOARD_PORT
 $PreviousDashboardPortEnvironment = $env:MARKETFUSION_DASHBOARD_PORT
+$HadSymbolEnvironment = Test-Path Env:\MARKETFUSION_ACTIVE_SYMBOL
+$PreviousSymbolEnvironment = $env:MARKETFUSION_ACTIVE_SYMBOL
+$HadViteSymbolEnvironment = Test-Path Env:\VITE_MARKETFUSION_SYMBOL
+$PreviousViteSymbolEnvironment = $env:VITE_MARKETFUSION_SYMBOL
 $env:MARKETFUSION_DASHBOARD_PORT = [string]$DashboardPort
+$env:MARKETFUSION_ACTIVE_SYMBOL = $Symbol
+$env:VITE_MARKETFUSION_SYMBOL = $Symbol
 try {
     if (-not (Test-Path -LiteralPath $Python)) { throw "Missing virtual-environment Python: $Python" }
     if (-not $Node) { throw 'Node.js is not installed or not on PATH' }
@@ -151,12 +158,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository safety validation failed' }
     New-Item -ItemType Directory -Force -Path $PidRoot, $LogRoot | Out-Null
     if (-not $SkipRuntime) {
-        if (Test-LegacyMarketFusionProcess 'v06_runtime' 'src.runtime.v06c_runner') { Write-Host 'v06_runtime already running from the V0.6 launcher; duplicate start skipped.' }
+        if ($Symbol -eq 'XAUUSD') { $null = Start-MarketFusionProcess 'v10a_xauusd_state' $Python @('-m','src.runtime.v10a_asset_state','--symbol','XAUUSD','--continuous','--interval-seconds','15') 'src.runtime.v10a_asset_state' }
+        elseif (Test-LegacyMarketFusionProcess 'v06_runtime' 'src.runtime.v06c_runner') { Write-Host 'v06_runtime already running from the V0.6 launcher; duplicate start skipped.' }
         else { $null = Start-MarketFusionProcess 'v06_runtime' $Python @('-m','src.runtime.v06c_runner','--continuous','--interval-seconds','15') 'src.runtime.v06c_runner' }
     }
     $ApiErrLog = Join-Path $LogRoot 'v07_api.err.log'
     $ApiPid = Start-MarketFusionProcess 'v07_api' $Python @('-m','src.dashboard.v07_api','--host','127.0.0.1','--port','8765') 'src.dashboard.v07_api'
-    Wait-MarketFusionEndpoint 'v07_api' 'src.dashboard.v07_api' $ApiPid 8765 'http://127.0.0.1:8765/api/health' $ApiErrLog $DashboardUrl
+    Wait-MarketFusionEndpoint 'v07_api' 'src.dashboard.v07_api' $ApiPid 8765 "http://127.0.0.1:8765/api/health?symbol=$Symbol" $ApiErrLog $DashboardUrl
     Write-Host 'V07 API: PASS'
     Write-Host "API PID: $ApiPid"
     Write-Host 'API port: 8765 LISTEN'
@@ -173,5 +181,9 @@ try {
 } finally {
     if ($HadDashboardPortEnvironment) { $env:MARKETFUSION_DASHBOARD_PORT = $PreviousDashboardPortEnvironment }
     else { Remove-Item Env:\MARKETFUSION_DASHBOARD_PORT -ErrorAction SilentlyContinue }
+    if ($HadSymbolEnvironment) { $env:MARKETFUSION_ACTIVE_SYMBOL = $PreviousSymbolEnvironment }
+    else { Remove-Item Env:\MARKETFUSION_ACTIVE_SYMBOL -ErrorAction SilentlyContinue }
+    if ($HadViteSymbolEnvironment) { $env:VITE_MARKETFUSION_SYMBOL = $PreviousViteSymbolEnvironment }
+    else { Remove-Item Env:\VITE_MARKETFUSION_SYMBOL -ErrorAction SilentlyContinue }
     Pop-Location
 }

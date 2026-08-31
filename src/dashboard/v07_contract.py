@@ -4,12 +4,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from src.assets.contracts import normalize_asset_id
 from src.marketdata.v05a_contract import ROOT
 
 CONTRACT_VERSION = "v0.7-local-dashboard-api-v1"
 HOST = "127.0.0.1"
 PORT = 8765
 DEFAULT_DASHBOARD_PORT = 4173
+try:
+    ACTIVE_SYMBOL = normalize_asset_id(os.environ.get("MARKETFUSION_ACTIVE_SYMBOL", "EURUSD"))
+except ValueError as exc:
+    raise RuntimeError("MARKETFUSION_ACTIVE_SYMBOL must be EURUSD or XAUUSD") from exc
 try:
     DASHBOARD_PORT = int(os.environ.get("MARKETFUSION_DASHBOARD_PORT", DEFAULT_DASHBOARD_PORT))
 except ValueError as exc:

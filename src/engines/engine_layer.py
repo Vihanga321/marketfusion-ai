@@ -14,6 +14,7 @@ from src.engines.patterns import detect_patterns
 from src.engines.price_action import breakout_events, candle_events
 from src.engines.structure import classify_swings, structure_events, structure_state, support_resistance
 from src.engines.swings import causal_bars, confirmed_swings, utc
+from src.assets.contracts import normalize_asset_id
 from src.marketdata.market_calendar import forex_session_state, market_calendar
 from src.marketdata.v05a_contract import CONTINUOUS_DIR, FEATURE_FILE, TIMEFRAMES
 
@@ -51,10 +52,11 @@ def _cached_parquet(path_text: str, modified_ns: int) -> pd.DataFrame:
     return pd.read_parquet(path_text, columns=columns)
 
 
-def load_completed_bars(timeframe: str, *, root: Path = CONTINUOUS_DIR, as_of: object | None = None, rows: int = BAR_WINDOW, observed_as_of: object | None = None) -> pd.DataFrame:
+def load_completed_bars(timeframe: str, *, root: Path = CONTINUOUS_DIR, symbol: str = "EURUSD", as_of: object | None = None, rows: int = BAR_WINDOW, observed_as_of: object | None = None) -> pd.DataFrame:
     if timeframe not in ANALYSIS_TIMEFRAMES:
         raise ValueError(f"Unsupported analysis timeframe: {timeframe}")
-    path = root / TIMEFRAMES[timeframe].filename
+    asset = normalize_asset_id(symbol)
+    path = root / (TIMEFRAMES[timeframe].filename if asset == "EURUSD" else f"{asset}_{timeframe}.parquet")
     if not path.exists():
         return pd.DataFrame()
     frame = _cached_parquet(str(path.resolve()), path.stat().st_mtime_ns).copy()
@@ -145,9 +147,9 @@ def _analyse_timeframe(frame: pd.DataFrame, timeframe: str, as_of: pd.Timestamp)
 
 
 @lru_cache(maxsize=24)
-def _cached_timeframe_analysis(timeframe: str, root_text: str, modified_ns: int, decision_iso: str, observed_iso: str) -> dict[str, Any]:
+def _cached_timeframe_analysis(timeframe: str, root_text: str, symbol: str, modified_ns: int, decision_iso: str, observed_iso: str) -> dict[str, Any]:
     del modified_ns
-    bars = load_completed_bars(timeframe, root=Path(root_text), as_of=decision_iso, rows=TIMEFRAME_LOAD_WINDOWS[timeframe], observed_as_of=observed_iso)
+    bars = load_completed_bars(timeframe, root=Path(root_text), symbol=symbol, as_of=decision_iso, rows=TIMEFRAME_LOAD_WINDOWS[timeframe], observed_as_of=observed_iso)
     return _analyse_timeframe(bars, timeframe, utc(decision_iso))
 
 
@@ -173,7 +175,8 @@ def _advanced_outputs(analyses: dict[str, dict[str, Any]], decision: object, now
     return {"price_action": price, "structure": structure, "liquidity": liquidity, "chart_patterns": pattern, "support_resistance": sr}
 
 
-def engine_status(now_utc: object | None = None, path: Path = FEATURE_FILE, bar_root: Path = CONTINUOUS_DIR, decision_as_of: object | None = None) -> dict[str, Any]:
+def engine_status(now_utc: object | None = None, path: Path = FEATURE_FILE, bar_root: Path = CONTINUOUS_DIR, decision_as_of: object | None = None, symbol: str = "EURUSD") -> dict[str, Any]:
+    asset = normalize_asset_id(symbol)
     now = utc(now_utc) if now_utc is not None else pd.Timestamp.now(tz="UTC")
     decision_cutoff = utc(decision_as_of) if decision_as_of is not None else now
     feature_frame = load_latest_frame(path, as_of=decision_cutoff)
@@ -188,12 +191,12 @@ def engine_status(now_utc: object | None = None, path: Path = FEATURE_FILE, bar_
     use_bars = path.resolve() == FEATURE_FILE.resolve() or bar_root.resolve() != CONTINUOUS_DIR.resolve()
     if use_bars:
         for timeframe in ANALYSIS_TIMEFRAMES:
-            bar_path = bar_root / TIMEFRAMES[timeframe].filename
+            bar_path = bar_root / (TIMEFRAMES[timeframe].filename if asset == "EURUSD" else f"{asset}_{timeframe}.parquet")
             if bar_path.exists():
                 modified_ns = bar_path.stat().st_mtime_ns
                 modified = pd.Timestamp(modified_ns, unit="ns", tz="UTC")
                 observed_cutoff = min(now, modified)
-                analyses[timeframe] = _cached_timeframe_analysis(timeframe, str(bar_root.resolve()), modified_ns, decision.isoformat(), observed_cutoff.isoformat())
+                analyses[timeframe] = _cached_timeframe_analysis(timeframe, str(bar_root.resolve()), asset, modified_ns, decision.isoformat(), observed_cutoff.isoformat())
     engines = _legacy_outputs(feature_frame, now)
     engines.update(_advanced_outputs(analyses, decision, now))
     external = {name: unavailable(name, "NO_VERIFIED_PROVIDER") for name in ("fundamental", "news", "sentiment", "intermarket")}
@@ -210,7 +213,7 @@ def engine_status(now_utc: object | None = None, path: Path = FEATURE_FILE, bar_
     agreement = "MIXED" if len(signs) > 1 else "BULLISH_ALIGNMENT" if signs == {1} else "BEARISH_ALIGNMENT" if signs == {-1} else "NO_DIRECTIONAL_ALIGNMENT"
     calendar = market_calendar(now)
     return {
-        "contract_version": ENGINE_CONTRACT_VERSION, "status": "PASS",
+        "contract_version": ENGINE_CONTRACT_VERSION, "status": "PASS", "asset_id": asset, "symbol": asset,
         "decision_timestamp_utc": decision.isoformat(), "market_status": calendar["status"],
         "data_freshness": engines["technical"]["input_freshness"], "engines": engines,
         "external_engines": external, "timeframes": analyses,
@@ -222,17 +225,17 @@ def engine_status(now_utc: object | None = None, path: Path = FEATURE_FILE, bar_
     }
 
 
-def recent_patterns(limit: int = 20, now_utc: object | None = None) -> dict[str, Any]:
+def recent_patterns(limit: int = 20, now_utc: object | None = None, symbol: str = "EURUSD", path: Path = FEATURE_FILE, bar_root: Path = CONTINUOUS_DIR) -> dict[str, Any]:
     bounded = max(1, min(int(limit), 100))
-    payload = engine_status(now_utc=now_utc)
+    payload = engine_status(now_utc=now_utc, symbol=symbol, path=path, bar_root=bar_root)
     items = payload.get("recent_patterns", [])[:bounded]
     return {"contract_version": ENGINE_CONTRACT_VERSION, "status": payload["status"], "count": len(items), "limit": bounded, "items": items, "observational_only": True, "trading_enabled": False}
 
 
-def decision_engine_snapshot(decision_utc: object, observed_at_utc: object | None = None) -> dict[str, Any]:
+def decision_engine_snapshot(decision_utc: object, observed_at_utc: object | None = None, *, symbol: str = "EURUSD", path: Path = FEATURE_FILE, bar_root: Path = CONTINUOUS_DIR) -> dict[str, Any]:
     """Compact observational context suitable for an immutable V0.8 row."""
     observed = pd.Timestamp.now(tz="UTC") if observed_at_utc is None else utc(observed_at_utc)
-    payload = engine_status(now_utc=observed, decision_as_of=decision_utc)
+    payload = engine_status(now_utc=observed, decision_as_of=decision_utc, symbol=symbol, path=path, bar_root=bar_root)
     compact_engines = {}
     for name in ("technical", "price_action", "structure", "liquidity", "regime"):
         item = payload.get("engines", {}).get(name, {})

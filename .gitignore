@@ -19,6 +19,10 @@ data/runtime/
 data/evaluation/
 data/research/
 data/backfill/
+data/market/
+data/features/
+data/evaluation/XAUUSD/
+data/runtime/XAUUSD/
 *.pid
 *.lock
 data/processed/*.parquet
@@ -40,4 +44,5 @@ dashboard/node_modules/
 dashboard/dist/
 dashboard/*.tsbuildinfo
 logs/v07/
+reports/XAUUSD/
 .vite/

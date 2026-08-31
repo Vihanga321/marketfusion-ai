@@ -1,0 +1,9 @@
+{
+  "asset_id": "XAUUSD",
+  "champions": {
+    "15": {"model_id": null, "model_status": "NO_APPROVED_MODEL"},
+    "60": {"model_id": null, "model_status": "NO_APPROVED_MODEL"},
+    "240": {"model_id": null, "model_status": "NO_APPROVED_MODEL"}
+  },
+  "trading_enabled": false
+}

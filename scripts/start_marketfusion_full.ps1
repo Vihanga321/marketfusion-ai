@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('EURUSD','XAUUSD')][string]$Symbol = 'XAUUSD',
     [switch]$NoBrowser,
     [ValidateRange(1, 65535)][int]$DashboardPort = 4173
 )
@@ -37,9 +38,18 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository safety validation failed' }
 } finally { Pop-Location }
 New-Item -ItemType Directory -Force -Path $PidRoot, $LogRoot | Out-Null
-Start-CollectorIfMissing 'v05a_collector' @('-m','src.marketdata.v05a_runner','--poll-seconds','15','--overlap-bars','8') 'src.marketdata.v05a_runner'
-Start-CollectorIfMissing 'v05b_collector' @('-m','src.intelligence.v05b_runner','--interval','300') 'src.intelligence.v05b_runner'
+if ($Symbol -eq 'XAUUSD') {
+    Write-Host 'EURUSD active collection is paused; its stored data, models, registry, reports, and observations are untouched.'
+    & $Python -m src.marketdata.v10a_asset --symbol XAUUSD --skip-optional
+    if ($LASTEXITCODE -ne 0) { throw 'XAUUSD broker discovery/data audit failed' }
+    Start-CollectorIfMissing 'v10a_xauusd_market' @('-m','src.marketdata.v10a_asset','--symbol','XAUUSD','--skip-optional','--incremental','--continuous','--interval-seconds','60') 'src.marketdata.v10a_asset'
+} else {
+    Start-CollectorIfMissing 'v05a_collector' @('-m','src.marketdata.v05a_runner','--poll-seconds','15','--overlap-bars','8') 'src.marketdata.v05a_runner'
+    Start-CollectorIfMissing 'v05b_collector' @('-m','src.intelligence.v05b_runner','--interval','300') 'src.intelligence.v05b_runner'
+}
+Start-CollectorIfMissing "realtime_quote_$Symbol" @('-m','src.marketdata.realtime_quote','--symbol',$Symbol,'--poll-ms','250') "src.marketdata.realtime_quote --symbol $Symbol"
 Write-Host 'V0.5C continuous training is intentionally NOT started.'
-& (Join-Path $PSScriptRoot 'start_marketfusion_dashboard.ps1') -NoBrowser:$NoBrowser -DashboardPort $DashboardPort
-Start-CollectorIfMissing 'v08_monitor' @('-m','src.evaluation.v08_runner','--continuous','--interval-seconds','300') 'src.evaluation.v08_runner'
+& (Join-Path $PSScriptRoot 'start_marketfusion_dashboard.ps1') -Symbol $Symbol -NoBrowser:$NoBrowser -DashboardPort $DashboardPort
+if ($Symbol -eq 'EURUSD') { Start-CollectorIfMissing 'v08_monitor' @('-m','src.evaluation.v08_runner','--continuous','--interval-seconds','300') 'src.evaluation.v08_runner' }
+else { Start-CollectorIfMissing 'v10a_xauusd_shadow' @('-m','src.evaluation.v10a_asset_recorder','--symbol','XAUUSD','--continuous','--interval-seconds','60') 'src.evaluation.v10a_asset_recorder' }
 Write-Host 'V0.8 heavy model research is intentionally NOT started; run it manually or on a controlled weekly schedule.'

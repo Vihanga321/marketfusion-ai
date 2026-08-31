@@ -1,0 +1,15 @@
+{
+  "active_asset": "XAUUSD",
+  "assets": {
+    "EURUSD": {
+      "enabled": false,
+      "pause_semantics": "STOP_ACTIVE_COLLECTION_ONLY_PRESERVE_ALL_ARTIFACTS"
+    },
+    "XAUUSD": {
+      "enabled": true,
+      "asset_class": "PRECIOUS_METAL",
+      "runtime": "SHADOW_ADVISORY_ONLY",
+      "automatic_execution": false
+    }
+  }
+}

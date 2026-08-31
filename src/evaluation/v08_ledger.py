@@ -151,7 +151,17 @@ def build_prediction_record(
     model_hashes = sorted({str(item.get("feature_contract_hash")) for item in horizons.values() if item.get("feature_contract_hash")})
     try:
         from src.engines.engine_layer import decision_engine_snapshot
-        engine_snapshot = decision_engine_snapshot(decision_time, engine_observed_at_utc or recorded)
+        symbol = str((state.get("system") or {}).get("symbol", "EURUSD"))
+        if symbol.upper() == "EURUSD":
+            engine_snapshot = decision_engine_snapshot(decision_time, engine_observed_at_utc or recorded)
+        else:
+            from src.assets.contracts import asset_paths, normalize_asset_id
+            asset = normalize_asset_id(symbol)
+            paths = asset_paths(asset)
+            engine_snapshot = decision_engine_snapshot(
+                decision_time, engine_observed_at_utc or recorded, symbol=asset,
+                path=paths.features / "features.parquet", bar_root=paths.bars,
+            )
     except Exception as exc:
         engine_snapshot = {
             "contract_version": None, "decision_timestamp_utc": decision_time.isoformat(),
