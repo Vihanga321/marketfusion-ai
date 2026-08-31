@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 import time
@@ -42,6 +41,17 @@ def _age_seconds(value: object, now: pd.Timestamp) -> float | None:
         return None
 
 
+def _same_utc(left: object, right: object) -> bool:
+    try:
+        a = pd.Timestamp(left)
+        b = pd.Timestamp(right)
+        a = a.tz_localize("UTC") if a.tzinfo is None else a.tz_convert("UTC")
+        b = b.tz_localize("UTC") if b.tzinfo is None else b.tz_convert("UTC")
+        return a == b
+    except Exception:
+        return False
+
+
 def _empty_horizons(champions: dict[int, dict[str, Any]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for horizon in (15, 60, 240):
@@ -66,16 +76,17 @@ def build_asset_state(asset_id: str = "XAUUSD", now_utc: object | None = None) -
     data_status = _json(paths.runtime / "asset_status.json")
     feature_path = paths.features / "features.parquet"
     feature_time = None
-    close = quote.get("mid")
+    decision_close = None
     spread_atr = None
     if feature_path.exists():
         try:
             latest = pd.read_parquet(feature_path).iloc[-1]
             feature_time = pd.Timestamp(latest["decision_timestamp_utc"]).isoformat()
-            close = quote.get("mid") if quote.get("mid") is not None else float(latest["close"])
+            decision_close = float(latest["close"])
             spread_atr = None if pd.isna(latest.get("spread_relative_to_atr")) else float(latest["spread_relative_to_atr"])
         except Exception:
             feature_time = None
+            decision_close = None
 
     quote_time = quote.get("normalized_tick_utc") or quote.get("received_at_utc")
     quote_age = _age_seconds(quote_time, now)
@@ -97,6 +108,12 @@ def build_asset_state(asset_id: str = "XAUUSD", now_utc: object | None = None) -
             if isinstance(inference_horizons, dict):
                 horizons = inference_horizons
             inference_time = inference.get("decision_timestamp_utc") or feature_time
+            # The immutable forward ledger uses market.close as the completed-M5
+            # decision reference. Never substitute the faster live quote mid.
+            if feature_time is None or inference_time is None or not _same_utc(inference_time, feature_time):
+                raise RuntimeError("XAUUSD_INFERENCE_FEATURE_REFERENCE_MISMATCH")
+            if decision_close is None:
+                raise RuntimeError("XAUUSD_COMPLETED_DECISION_CLOSE_UNAVAILABLE")
         except Exception as exc:
             inference_error = f"{type(exc).__name__}: {exc}"
             horizons = _empty_horizons(champions)
@@ -176,7 +193,10 @@ def build_asset_state(asset_id: str = "XAUUSD", now_utc: object | None = None) -
             },
         },
         "market": {
-            "close": close, "bid": quote.get("bid"), "ask": quote.get("ask"),
+            # Completed causal M5 reference used by shadow evaluation.
+            "close": decision_close,
+            # Fast hot-path quote remains separately visible to the dashboard.
+            "live_mid": quote.get("mid"), "bid": quote.get("bid"), "ask": quote.get("ask"),
             "quote_freshness": {"status": quote_freshness, "observed_at_utc": quote_time, "age_seconds": quote_age},
             "feature_freshness": {"status": generic_feature_freshness, "observed_at_utc": feature_time, "age_seconds": generic_feature_age},
             "freshness": {
