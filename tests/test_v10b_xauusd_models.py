@@ -124,8 +124,14 @@ class V10BXAUUSDModelTests(unittest.TestCase):
         self.assertTrue(np.allclose(probability.sum(axis=1), 1.0))
 
     def test_weak_candidate_cannot_be_promoted(self) -> None:
-        candidate = {"balanced_accuracy": 0.34, "macro_f1": 0.33, "log_loss": 1.08, "brier": 0.66}
-        majority = {"balanced_accuracy": 0.333, "macro_f1": 0.30, "log_loss": 1.10, "brier": 0.66, "cost_aware_metric": -0.001}
+        candidate = {
+            "balanced_accuracy": 0.34, "macro_f1": 0.33, "log_loss": 1.08,
+            "brier": 0.66, "cost_aware_metric": -0.001,
+        }
+        majority = {
+            "balanced_accuracy": 0.333, "macro_f1": 0.30, "log_loss": 1.10,
+            "brier": 0.66, "cost_aware_metric": -0.001,
+        }
         prior = {**majority, "log_loss": 1.09}
         previous = {**majority, "cost_aware_metric": -0.0001}
         promoted, reason = _promotion_decision(
