@@ -37,6 +37,7 @@ reports/marketfusion_full_local_runtime_validation.txt
 reports/v08_live_shadow_validation.txt
 models/v05c/
 models/v08/
+models/XAUUSD/artifacts/
 jforex-event-exporter/target/
 .vscode/
 .idea/
