@@ -6,15 +6,19 @@ import unittest
 from unittest.mock import patch
 
 import pandas as pd
+import requests
 
 from src.intelligence.gold_macro_context import (
     CONTEXT_SERIES,
     CONSERVATIVE_AVAILABILITY_LAG_DAYS,
+    FRED_MAX_ATTEMPTS,
     _parse_fred_csv,
     context_feature_names,
     context_store,
+    fetch_fred_series,
     join_context_asof,
     refresh_gold_macro_context,
+    series_cache_path,
 )
 from src.research.v10b3_xauusd_macro_intermarket import FEATURE_SETS, evidence_gate
 
@@ -41,6 +45,29 @@ class _Session:
         )
 
 
+class _FlakySession(_Session):
+    def __init__(self, failures: int) -> None:
+        self.failures = failures
+        self.calls = 0
+
+    def get(self, url: str, **kwargs: object) -> _Response:
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise requests.exceptions.ReadTimeout("simulated FRED timeout")
+        return super().get(url, **kwargs)
+
+
+class _SelectiveFailureSession(_Session):
+    def __init__(self, fail_series: set[str]) -> None:
+        self.fail_series = fail_series
+
+    def get(self, url: str, **kwargs: object) -> _Response:
+        series_id = url.rsplit("=", 1)[-1]
+        if series_id in self.fail_series:
+            raise requests.exceptions.ReadTimeout(f"simulated timeout {series_id}")
+        return super().get(url, **kwargs)
+
+
 class V10B3GoldMacroContextTests(unittest.TestCase):
     def test_fred_csv_uses_conservative_availability(self) -> None:
         spec = CONTEXT_SERIES[0]
@@ -53,14 +80,62 @@ class V10B3GoldMacroContextTests(unittest.TestCase):
         self.assertEqual(CONSERVATIVE_AVAILABILITY_LAG_DAYS, 4)
         self.assertFalse(bool(frame["vintage_safe"].any()))
 
+    def test_fetch_retries_transient_timeout(self) -> None:
+        session = _FlakySession(failures=1)
+        with patch("src.intelligence.gold_macro_context.time.sleep", return_value=None):
+            frame, metadata = fetch_fred_series(CONTEXT_SERIES[0], session=session)
+        self.assertFalse(frame.empty)
+        self.assertEqual(session.calls, 2)
+        self.assertEqual(metadata["download_attempts"], 2)
+        self.assertEqual(metadata["source_mode"], "NETWORK_REFRESH")
+
+    def test_fetch_fails_after_bounded_attempts(self) -> None:
+        session = _FlakySession(failures=100)
+        with patch("src.intelligence.gold_macro_context.time.sleep", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "failed after"):
+                fetch_fred_series(CONTEXT_SERIES[0], session=session)
+        self.assertEqual(session.calls, FRED_MAX_ATTEMPTS)
+
     def test_refresh_persists_verified_series_without_secrets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             frame, manifest = refresh_gold_macro_context(root, session=_Session())
             self.assertEqual(set(frame["series_id"]), {item.series_id for item in CONTEXT_SERIES})
             self.assertTrue(context_store(root).exists())
+            self.assertTrue(all(series_cache_path(item, root).exists() for item in CONTEXT_SERIES))
             self.assertFalse(manifest["vintage_safe"])
             self.assertFalse(manifest["production_model_eligible"])
+            self.assertEqual(manifest["network_refresh_count"], len(CONTEXT_SERIES))
+            self.assertEqual(manifest["cache_fallback_count"], 0)
+
+    def test_refresh_uses_last_good_series_cache_on_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            refresh_gold_macro_context(root, session=_Session())
+            failing = {CONTEXT_SERIES[1].series_id}
+            with patch("src.intelligence.gold_macro_context.time.sleep", return_value=None):
+                frame, manifest = refresh_gold_macro_context(
+                    root, session=_SelectiveFailureSession(failing)
+                )
+            self.assertEqual(set(frame["series_id"]), {item.series_id for item in CONTEXT_SERIES})
+            self.assertEqual(manifest["cache_fallback_count"], 1)
+            cached = next(item for item in manifest["series"] if item["series_id"] in failing)
+            self.assertEqual(cached["source_mode"], "CACHE_FALLBACK")
+            self.assertIn("timeout", cached["last_refresh_error"].lower())
+
+    def test_incomplete_first_refresh_preserves_successful_series_for_resume(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            failed_id = CONTEXT_SERIES[-1].series_id
+            with patch("src.intelligence.gold_macro_context.time.sleep", return_value=None):
+                with self.assertRaisesRegex(RuntimeError, "Successful series were cached for resume"):
+                    refresh_gold_macro_context(
+                        root, session=_SelectiveFailureSession({failed_id})
+                    )
+            self.assertFalse(context_store(root).exists())
+            for spec in CONTEXT_SERIES[:-1]:
+                self.assertTrue(series_cache_path(spec, root).exists())
+            self.assertFalse(series_cache_path(CONTEXT_SERIES[-1], root).exists())
 
     def test_asof_join_never_uses_future_context(self) -> None:
         rows = []
