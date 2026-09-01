@@ -17,13 +17,16 @@ import pandas as pd
 
 from src.assets.contracts import ROOT, asset_paths, discover_broker_symbol
 
-CONTRACT_VERSION = "v1.0b4-xauusd-intraday-context-audit-v1"
+CONTRACT_VERSION = "v1.0b4-xauusd-intraday-context-audit-v2"
 PREDICTION_TARGET = "XAUUSD"
 M5_AUDIT_ROWS = 5_000
 M15_AUDIT_ROWS = 2_000
 MIN_READY_M5_ROWS = 1_000
 MIN_READY_M15_ROWS = 400
 FUTURE_TICK_TOLERANCE_SECONDS = 5.0
+MAX_BROKER_CLOCK_OFFSET_SECONDS = 14 * 60 * 60
+BROKER_CLOCK_QUANTUM_SECONDS = 15 * 60
+BROKER_CLOCK_RESIDUAL_TOLERANCE_SECONDS = 120.0
 
 
 @dataclass(frozen=True)
@@ -95,11 +98,61 @@ def _normalized_name(value: str) -> str:
     return "".join(ch for ch in str(value).upper() if ch.isalnum())
 
 
+def _identity_guard(symbol: Any, family: ContextFamily) -> bool:
+    """Reject ticker collisions and unrelated securities before ranking.
+
+    MT5 catalogs can contain stocks/ETFs whose ticker happens to be USDX, WTI,
+    IEF, etc. Exact ticker text alone is therefore not sufficient identity
+    evidence for non-FX context families.
+    """
+    text = _symbol_text(symbol)
+    description = str(getattr(symbol, "description", "")).upper()
+    path = str(getattr(symbol, "path", "")).upper()
+    base = str(getattr(symbol, "currency_base", "")).upper()
+    profit = str(getattr(symbol, "currency_profit", "")).upper()
+
+    if family.currency_base and family.currency_profit:
+        return (base, profit) == (family.currency_base, family.currency_profit)
+
+    if family.key == "USD_INDEX":
+        identity = (
+            "DOLLAR INDEX" in text
+            or "USD INDEX" in text
+            or "US DOLLAR INDEX" in text
+            or "DXY INDEX" in text
+        )
+        security_collision = any(token in f"{description} {path}" for token in (" ETF", "EQUITY", "STOCK", "SHARE"))
+        return identity and not security_collision
+
+    if family.key == "US500":
+        identity = "500" in text and any(token in text for token in ("SPX", "S&P", "US 500", "US500"))
+        return identity and ("INDEX" in text or "INDICES" in path)
+
+    if family.key == "US100":
+        identity = "100" in text and any(token in text for token in ("NASDAQ", "NAS100", "USTEC", "US TECH", "US100"))
+        return identity and ("INDEX" in text or "INDICES" in path)
+
+    if family.key == "WTI":
+        oil_identity = any(token in text for token in ("CRUDE OIL", "WTI OIL", "WEST TEXAS", "US OIL", "USOIL", "XTIUSD"))
+        security_collision = any(token in f"{description} {path}" for token in (" INC", " CORP", " LTD", " PLC", " ETF", "EQUITY", "STOCK", "SHARE"))
+        return oil_identity and not security_collision
+
+    if family.key == "US10Y":
+        direct_name = _normalized_name(getattr(symbol, "name", "")) in {_normalized_name(item) for item in family.exact_names}
+        treasury_identity = any(token in text for token in ("10 YEAR TREASURY", "10-YEAR TREASURY", "10Y TREASURY", "10 YEAR NOTE", "10-YEAR NOTE"))
+        security_collision = any(token in f"{description} {path}" for token in (" ETF", "ISHARES", "PROSHARES", "EQUITY", "STOCK", "SHARE"))
+        return (direct_name or treasury_identity) and not security_collision
+
+    return True
+
+
 def _candidate_score(symbol: Any, family: ContextFamily) -> int:
     name = str(getattr(symbol, "name", ""))
     normalized = _normalized_name(name)
     text = _symbol_text(symbol)
     if any(token.upper() in text for token in family.excluded_tokens):
+        return -1
+    if not _identity_guard(symbol, family):
         return -1
 
     score = 0
@@ -114,7 +167,7 @@ def _candidate_score(symbol: Any, family: ContextFamily) -> int:
     if family.currency_base and family.currency_profit:
         if (base, profit) == (family.currency_base, family.currency_profit):
             score += 90
-        elif base or profit:
+        else:
             return -1
 
     for group in family.token_groups:
@@ -135,15 +188,70 @@ def rank_context_candidates(symbols: Iterable[Any], family: ContextFamily) -> li
     ]
 
 
-def _rates_summary(rates: Any, captured_at: datetime) -> dict[str, object]:
+def _tick_epoch_seconds(tick: Any) -> float | None:
+    if tick is None:
+        return None
+    raw_time = getattr(tick, "time", None)
+    raw_msc = getattr(tick, "time_msc", None)
+    try:
+        if raw_msc not in (None, 0):
+            value = float(raw_msc) / 1000.0
+        elif raw_time not in (None, 0):
+            value = float(raw_time)
+        else:
+            return None
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if value > 0 else None
+
+
+def _calibrate_broker_clock(tick: Any, captured_at: datetime) -> dict[str, object]:
+    """Measure a fixed MT5 server clock offset from the XAUUSD live tick.
+
+    The offset is measured, never assumed. We accept only timezone-like offsets
+    close to a 15-minute quantum and preserve the observed residual for audit.
+    """
+    epoch_seconds = _tick_epoch_seconds(tick)
+    if epoch_seconds is None:
+        return {
+            "status": "UNRESOLVED",
+            "reason": "XAUUSD_LIVE_TICK_TIMESTAMP_UNAVAILABLE",
+            "observed_offset_seconds": None,
+            "normalized_offset_seconds": None,
+            "residual_seconds": None,
+        }
+    observed = epoch_seconds - captured_at.timestamp()
+    normalized = round(observed / BROKER_CLOCK_QUANTUM_SECONDS) * BROKER_CLOCK_QUANTUM_SECONDS
+    residual = observed - normalized
+    if abs(normalized) > MAX_BROKER_CLOCK_OFFSET_SECONDS or abs(residual) > BROKER_CLOCK_RESIDUAL_TOLERANCE_SECONDS:
+        return {
+            "status": "UNRESOLVED",
+            "reason": "XAUUSD_CLOCK_OFFSET_NOT_TIMEZONE_LIKE",
+            "observed_offset_seconds": float(observed),
+            "normalized_offset_seconds": None,
+            "residual_seconds": float(residual),
+        }
+    return {
+        "status": "PASS",
+        "reason": "MEASURED_FROM_XAUUSD_LIVE_TICK",
+        "observed_offset_seconds": float(observed),
+        "normalized_offset_seconds": int(normalized),
+        "residual_seconds": float(residual),
+        "raw_tick_utc": datetime.fromtimestamp(epoch_seconds, timezone.utc).isoformat(),
+        "normalized_tick_utc": datetime.fromtimestamp(epoch_seconds - normalized, timezone.utc).isoformat(),
+    }
+
+
+def _rates_summary(rates: Any, captured_at: datetime, clock_offset_seconds: int) -> dict[str, object]:
     if rates is None:
         return {"rows": 0, "first_bar_utc": None, "last_bar_utc": None, "duplicates": 0, "future_bars": 0}
     frame = pd.DataFrame(rates)
     if frame.empty or "time" not in frame.columns:
         return {"rows": 0, "first_bar_utc": None, "last_bar_utc": None, "duplicates": 0, "future_bars": 0}
-    timestamps = pd.to_datetime(pd.to_numeric(frame["time"], errors="coerce"), unit="s", utc=True, errors="coerce").dropna()
-    if timestamps.empty:
+    raw_timestamps = pd.to_datetime(pd.to_numeric(frame["time"], errors="coerce"), unit="s", utc=True, errors="coerce").dropna()
+    if raw_timestamps.empty:
         return {"rows": 0, "first_bar_utc": None, "last_bar_utc": None, "duplicates": 0, "future_bars": 0}
+    timestamps = raw_timestamps - pd.Timedelta(seconds=clock_offset_seconds)
     captured = pd.Timestamp(captured_at)
     if captured.tzinfo is None:
         captured = captured.tz_localize("UTC")
@@ -151,36 +259,57 @@ def _rates_summary(rates: Any, captured_at: datetime) -> dict[str, object]:
         captured = captured.tz_convert("UTC")
     return {
         "rows": int(len(timestamps)),
+        "raw_first_bar_utc": pd.Timestamp(raw_timestamps.min()).isoformat(),
+        "raw_last_bar_utc": pd.Timestamp(raw_timestamps.max()).isoformat(),
         "first_bar_utc": pd.Timestamp(timestamps.min()).isoformat(),
         "last_bar_utc": pd.Timestamp(timestamps.max()).isoformat(),
+        "clock_offset_seconds_applied": int(clock_offset_seconds),
         "duplicates": int(timestamps.duplicated().sum()),
         "future_bars": int((timestamps > captured + pd.Timedelta(seconds=FUTURE_TICK_TOLERANCE_SECONDS)).sum()),
     }
 
 
-def _tick_summary(tick: Any, captured_at: datetime) -> dict[str, object]:
+def _tick_summary(tick: Any, captured_at: datetime, clock_offset_seconds: int) -> dict[str, object]:
     if tick is None:
         return {"status": "UNAVAILABLE", "bid": None, "ask": None, "raw_time": None, "raw_time_msc": None, "tick_utc": None, "age_seconds": None}
     raw_time = getattr(tick, "time", None)
     raw_msc = getattr(tick, "time_msc", None)
+    epoch_seconds = _tick_epoch_seconds(tick)
+    if epoch_seconds is None:
+        return {
+            "status": "UNAVAILABLE",
+            "bid": float(getattr(tick, "bid", 0.0)), "ask": float(getattr(tick, "ask", 0.0)),
+            "raw_time": raw_time, "raw_time_msc": raw_msc, "tick_utc": None, "age_seconds": None,
+        }
     try:
-        epoch_seconds = float(raw_msc) / 1000.0 if raw_msc not in (None, 0) else float(raw_time)
-        tick_utc = datetime.fromtimestamp(epoch_seconds, timezone.utc)
+        raw_tick_utc = datetime.fromtimestamp(epoch_seconds, timezone.utc)
+        tick_utc = datetime.fromtimestamp(epoch_seconds - clock_offset_seconds, timezone.utc)
+        raw_age = (captured_at - raw_tick_utc).total_seconds()
         age = (captured_at - tick_utc).total_seconds()
     except (TypeError, ValueError, OSError, OverflowError):
         return {"status": "INVALID_TIMESTAMP", "bid": getattr(tick, "bid", None), "ask": getattr(tick, "ask", None), "raw_time": raw_time, "raw_time_msc": raw_msc, "tick_utc": None, "age_seconds": None}
     status = "FUTURE_TIMESTAMP" if age < -FUTURE_TICK_TOLERANCE_SECONDS else "AVAILABLE"
     return {
-        "status": status, "bid": float(getattr(tick, "bid", 0.0)), "ask": float(getattr(tick, "ask", 0.0)),
-        "raw_time": raw_time, "raw_time_msc": raw_msc, "tick_utc": tick_utc.isoformat(), "age_seconds": float(age),
+        "status": status,
+        "bid": float(getattr(tick, "bid", 0.0)), "ask": float(getattr(tick, "ask", 0.0)),
+        "raw_time": raw_time, "raw_time_msc": raw_msc,
+        "raw_tick_utc": raw_tick_utc.isoformat(), "raw_age_seconds": float(raw_age),
+        "tick_utc": tick_utc.isoformat(), "age_seconds": float(age),
+        "clock_offset_seconds_applied": int(clock_offset_seconds),
     }
 
 
-def _audit_family(mt5: Any, symbols: list[Any], family: ContextFamily, captured_at: datetime) -> dict[str, object]:
+def _audit_family(
+    mt5: Any,
+    symbols: list[Any],
+    family: ContextFamily,
+    captured_at: datetime,
+    clock_offset_seconds: int,
+) -> dict[str, object]:
     candidates = rank_context_candidates(symbols, family)
     candidate_names = [str(getattr(item, "name", "")) for item in candidates[:5]]
     if not candidates:
-        return {"family": family.key, "label": family.label, "tier": family.tier, "status": "UNAVAILABLE", "reason": "NO_BROKER_SYMBOL_CANDIDATE", "candidate_names": []}
+        return {"family": family.key, "label": family.label, "tier": family.tier, "status": "UNAVAILABLE", "reason": "NO_VERIFIED_BROKER_SYMBOL_CANDIDATE", "candidate_names": []}
 
     selected_name: str | None = None
     select_errors: list[str] = []
@@ -196,9 +325,9 @@ def _audit_family(mt5: Any, symbols: list[Any], family: ContextFamily, captured_
         return {"family": family.key, "label": family.label, "tier": family.tier, "status": "UNAVAILABLE", "reason": "SYMBOL_SELECT_FAILED", "candidate_names": candidate_names, "errors": select_errors}
 
     info = mt5.symbol_info(selected_name)
-    tick = _tick_summary(mt5.symbol_info_tick(selected_name), captured_at)
-    m5 = _rates_summary(mt5.copy_rates_from_pos(selected_name, getattr(mt5, "TIMEFRAME_M5"), 1, M5_AUDIT_ROWS), captured_at)
-    m15 = _rates_summary(mt5.copy_rates_from_pos(selected_name, getattr(mt5, "TIMEFRAME_M15"), 1, M15_AUDIT_ROWS), captured_at)
+    tick = _tick_summary(mt5.symbol_info_tick(selected_name), captured_at, clock_offset_seconds)
+    m5 = _rates_summary(mt5.copy_rates_from_pos(selected_name, getattr(mt5, "TIMEFRAME_M5"), 1, M5_AUDIT_ROWS), captured_at, clock_offset_seconds)
+    m15 = _rates_summary(mt5.copy_rates_from_pos(selected_name, getattr(mt5, "TIMEFRAME_M15"), 1, M15_AUDIT_ROWS), captured_at, clock_offset_seconds)
 
     invalid_future = tick.get("status") == "FUTURE_TIMESTAMP" or int(m5["future_bars"]) > 0 or int(m15["future_bars"]) > 0
     ready_history = int(m5["rows"]) >= MIN_READY_M5_ROWS and int(m15["rows"]) >= MIN_READY_M15_ROWS
@@ -216,6 +345,7 @@ def _audit_family(mt5: Any, symbols: list[Any], family: ContextFamily, captured_
         "status": status, "reason": reason, "broker_symbol": selected_name,
         "candidate_names": candidate_names,
         "description": str(getattr(info, "description", "")) if info is not None else "",
+        "path": str(getattr(info, "path", "")) if info is not None else "",
         "currency_base": str(getattr(info, "currency_base", "")) if info is not None else "",
         "currency_profit": str(getattr(info, "currency_profit", "")) if info is not None else "",
         "tick": tick, "M5": m5, "M15": m15,
@@ -237,11 +367,40 @@ def run_audit(mt5: Any, *, root: Path = ROOT, persist: bool = True, captured_at:
         captured = captured.astimezone(timezone.utc)
 
     gold = discover_broker_symbol(mt5, PREDICTION_TARGET)
+    if not mt5.symbol_select(gold.broker_symbol, True):
+        raise RuntimeError(f"MT5 symbol_select({gold.broker_symbol!r}) failed for broker-clock calibration")
+    broker_clock = _calibrate_broker_clock(mt5.symbol_info_tick(gold.broker_symbol), captured)
+    if broker_clock["status"] != "PASS":
+        payload: dict[str, object] = {
+            "contract_version": CONTRACT_VERSION,
+            "captured_at_utc": captured.isoformat(),
+            "prediction_target": PREDICTION_TARGET,
+            "prediction_broker_symbol": gold.broker_symbol,
+            "context_read_only": True,
+            "decision": "NO_VERIFIED_INTRADAY_CONTEXT",
+            "next_phase": "RESOLVE_MT5_BROKER_CLOCK_BEFORE_CONTEXT_RESEARCH",
+            "broker_clock_calibration": broker_clock,
+            "core_ready_count": 0,
+            "ready_family_count": 0,
+            "invalid_family_count": 0,
+            "families": [],
+            "model_promotion": "NONE",
+            "production_integration": False,
+            "automatic_execution": "DISABLED",
+            "runtime": "SHADOW_ADVISORY_ONLY",
+            "manual_confirmation": "REQUIRED",
+        }
+        if persist:
+            report = asset_paths(PREDICTION_TARGET, root).reports / "v10b4_intraday_context_audit.json"
+            _atomic_json(report, payload)
+        return payload
+
+    clock_offset_seconds = int(broker_clock["normalized_offset_seconds"])
     symbols_raw = mt5.symbols_get()
     if symbols_raw is None:
         raise RuntimeError(f"MT5 symbols_get failed: {mt5.last_error()}")
     symbols = list(symbols_raw)
-    families = [_audit_family(mt5, symbols, family, captured) for family in CONTEXT_FAMILIES]
+    families = [_audit_family(mt5, symbols, family, captured, clock_offset_seconds) for family in CONTEXT_FAMILIES]
 
     core_ready = [item for item in families if item["tier"] == "CORE" and item["status"] == "READY"]
     all_ready = [item for item in families if item["status"] == "READY"]
@@ -256,12 +415,13 @@ def run_audit(mt5: Any, *, root: Path = ROOT, persist: bool = True, captured_at:
         decision = "NO_VERIFIED_INTRADAY_CONTEXT"
         next_phase = "ADD_EXTERNAL_VERIFIED_INTRADAY_PROVIDER"
 
-    payload: dict[str, object] = {
+    payload = {
         "contract_version": CONTRACT_VERSION,
         "captured_at_utc": captured.isoformat(),
         "prediction_target": PREDICTION_TARGET,
         "prediction_broker_symbol": gold.broker_symbol,
         "context_read_only": True,
+        "broker_clock_calibration": broker_clock,
         "decision": decision,
         "next_phase": next_phase,
         "core_ready_count": len(core_ready),
