@@ -42,8 +42,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository safety validation failed' }
 
     Write-Host 'MarketFusion V1.0B.3 XAUUSD verified macro/intermarket evidence research'
-    Write-Host 'Sources: Federal Reserve/FRED market series only; no fabricated news or sentiment.'
-    Write-Host 'Current-vintage FRED history is RESEARCH ONLY and cannot promote a production champion.'
+    Write-Host 'Preferred provider: Federal Reserve/FRED. Official Board fallback is available if FRED is unreachable.'
+    Write-Host 'No fabricated news, sentiment, fundamentals, or market values are used.'
+    Write-Host 'Current-vintage history is RESEARCH ONLY and cannot promote a production champion.'
     Write-Host 'The previously exposed final XAUUSD tail remains quarantined.'
     Write-Host 'Automatic execution remains DISABLED; runtime remains SHADOW_ADVISORY_ONLY.'
     Write-Host "Research CPU worker ceiling: $env:LOKY_MAX_CPU_COUNT ($WorkerCeilingSource)"
@@ -51,8 +52,27 @@ try {
     $Arguments = @('-m', 'src.research.v10b3_xauusd_macro_intermarket')
     if ($NoPersist) { $Arguments += '--no-persist' }
     if ($Offline) { $Arguments += '--offline' }
+
     & $Python @Arguments
-    if ($LASTEXITCODE -ne 0) { throw 'V1.0B.3 XAUUSD macro/intermarket research failed' }
+    $ResearchExit = $LASTEXITCODE
+
+    if ($ResearchExit -ne 0 -and -not $Offline) {
+        Write-Warning 'FRED refresh/research did not complete. Trying official federalreserve.gov fallback context.'
+        & $Python -m src.intelligence.gold_macro_fed_board_fallback
+        $FallbackExit = $LASTEXITCODE
+        if ($FallbackExit -eq 0) {
+            Write-Host 'Official Federal Reserve Board fallback context: PASS'
+            Write-Host 'Re-running V1.0B.3 from the verified local context store...'
+            $OfflineArguments = @('-m', 'src.research.v10b3_xauusd_macro_intermarket', '--offline')
+            if ($NoPersist) { $OfflineArguments += '--no-persist' }
+            & $Python @OfflineArguments
+            $ResearchExit = $LASTEXITCODE
+        } else {
+            $ResearchExit = $FallbackExit
+        }
+    }
+
+    if ($ResearchExit -ne 0) { throw 'V1.0B.3 XAUUSD macro/intermarket research failed' }
 } finally {
     Pop-Location
     if ($HadLokyCpuCount) { $env:LOKY_MAX_CPU_COUNT = $PreviousLokyCpuCount }
