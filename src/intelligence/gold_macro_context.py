@@ -1,10 +1,15 @@
 """Verified, research-only macro/intermarket context for XAUUSD.
 
 This module intentionally uses only named public Federal Reserve series and
-never fabricates unavailable values.  FRED historical CSV downloads are
+never fabricates unavailable values. FRED historical CSV downloads are
 current-vintage data, so they are NOT production/vintage-safe evidence for
-model promotion.  A conservative availability lag is applied before any
+model promotion. A conservative availability lag is applied before any
 as-of join to XAUUSD decision timestamps.
+
+Provider refresh is restartable: every successfully downloaded series is
+persisted independently before the combined context store is replaced. Network
+timeouts therefore do not destroy last-good context or force already completed
+series downloads to be repeated successfully in the same process.
 """
 from __future__ import annotations
 
@@ -13,6 +18,7 @@ from hashlib import sha256
 from io import StringIO
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 import numpy as np
@@ -22,15 +28,19 @@ import requests
 from src.assets.contracts import ROOT
 
 PROVIDER_ID = "FRED_PUBLIC_CSV"
-CONTRACT_VERSION = "v1.0b3-gold-macro-context-v1"
+CONTRACT_VERSION = "v1.0b3-gold-macro-context-v2"
 FREDGRAPH_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
 # FRED page timestamps show daily market series are generally published after
-# the observation date.  Because fredgraph CSV does not carry historical
+# the observation date. Because fredgraph CSV does not carry historical
 # release timestamps/vintages, this research layer waits four full calendar
 # days and uses 23:59 UTC before a value may become visible to XAUUSD research.
 # This is deliberately conservative, but still not a substitute for ALFRED or
 # another vintage-safe production provider.
 CONSERVATIVE_AVAILABILITY_LAG_DAYS = 4
+FRED_CONNECT_TIMEOUT_SECONDS = 10.0
+FRED_READ_TIMEOUT_SECONDS = 120.0
+FRED_MAX_ATTEMPTS = 4
+FRED_BACKOFF_SECONDS = (0.0, 2.0, 5.0, 10.0)
 
 
 @dataclass(frozen=True)
@@ -72,6 +82,14 @@ def context_store(root: Path = ROOT) -> Path:
 
 def context_manifest_path(root: Path = ROOT) -> Path:
     return context_root(root) / "manifest.json"
+
+
+def series_cache_path(spec: ContextSeries, root: Path = ROOT) -> Path:
+    return context_root(root) / "series" / f"{spec.series_id}.parquet"
+
+
+def series_manifest_path(spec: ContextSeries, root: Path = ROOT) -> Path:
+    return context_root(root) / "series" / f"{spec.series_id}.json"
 
 
 def _atomic_json(path: Path, payload: Any) -> None:
@@ -120,50 +138,156 @@ def _parse_fred_csv(text: str, spec: ContextSeries) -> pd.DataFrame:
     return normalized
 
 
-def fetch_fred_series(
-    spec: ContextSeries,
-    session: requests.Session | None = None,
-    timeout_seconds: float = 30.0,
-) -> tuple[pd.DataFrame, dict[str, Any]]:
-    client = session or requests.Session()
-    url = FREDGRAPH_URL.format(series_id=spec.series_id)
-    response = client.get(url, timeout=timeout_seconds, headers={"User-Agent": "MarketFusion-research/1.0"})
-    response.raise_for_status()
-    text = response.text
-    frame = _parse_fred_csv(text, spec)
-    metadata = {
+def _series_metadata(spec: ContextSeries, frame: pd.DataFrame, *, url: str, payload_sha256: str | None,
+                     retrieved_at_utc: str | None, source_mode: str, attempts: int,
+                     last_error: str | None = None) -> dict[str, Any]:
+    return {
         **asdict(spec),
         "provider_id": PROVIDER_ID,
         "url": url,
-        "retrieved_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-        "payload_sha256": sha256(text.encode("utf-8")).hexdigest(),
+        "retrieved_at_utc": retrieved_at_utc,
+        "payload_sha256": payload_sha256,
         "rows": len(frame),
         "first_observation": pd.Timestamp(frame["observation_date_utc"].min()).isoformat(),
         "last_observation": pd.Timestamp(frame["observation_date_utc"].max()).isoformat(),
         "availability_policy": f"observation_date + {CONSERVATIVE_AVAILABILITY_LAG_DAYS} calendar days + 23:59 UTC",
         "vintage_safe": False,
         "research_only": True,
+        "source_mode": source_mode,
+        "download_attempts": attempts,
+        "last_refresh_error": last_error,
     }
-    return frame, metadata
+
+
+def fetch_fred_series(
+    spec: ContextSeries,
+    session: requests.Session | None = None,
+    timeout_seconds: float | tuple[float, float] | None = None,
+    max_attempts: int = FRED_MAX_ATTEMPTS,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Fetch one FRED series with bounded retries and explicit timeouts."""
+    client = session or requests.Session()
+    url = FREDGRAPH_URL.format(series_id=spec.series_id)
+    timeout: float | tuple[float, float] = timeout_seconds or (
+        FRED_CONNECT_TIMEOUT_SECONDS, FRED_READ_TIMEOUT_SECONDS
+    )
+    last_error: Exception | None = None
+    attempts = max(1, int(max_attempts))
+    for attempt in range(1, attempts + 1):
+        if attempt > 1:
+            delay_index = min(attempt - 1, len(FRED_BACKOFF_SECONDS) - 1)
+            delay = FRED_BACKOFF_SECONDS[delay_index]
+            if delay > 0:
+                time.sleep(delay)
+        try:
+            response = client.get(
+                url,
+                timeout=timeout,
+                headers={"User-Agent": "MarketFusion-research/1.0"},
+            )
+            response.raise_for_status()
+            text = response.text
+            frame = _parse_fred_csv(text, spec)
+            retrieved_at = pd.Timestamp.now(tz="UTC").isoformat()
+            metadata = _series_metadata(
+                spec, frame, url=url,
+                payload_sha256=sha256(text.encode("utf-8")).hexdigest(),
+                retrieved_at_utc=retrieved_at,
+                source_mode="NETWORK_REFRESH",
+                attempts=attempt,
+            )
+            return frame, metadata
+        except requests.RequestException as exc:
+            last_error = exc
+    assert last_error is not None
+    raise RuntimeError(
+        f"FRED {spec.series_id} refresh failed after {attempts} attempts: "
+        f"{type(last_error).__name__}: {last_error}"
+    ) from last_error
+
+
+def _load_series_cache(spec: ContextSeries, root: Path) -> tuple[pd.DataFrame, dict[str, Any]]:
+    path = series_cache_path(spec, root)
+    if not path.exists():
+        raise FileNotFoundError(path)
+    frame = pd.read_parquet(path)
+    required = {
+        "series_key", "series_id", "observation_date_utc", "available_at_utc",
+        "value", "change_1", "change_5", "vintage_safe",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"Cached FRED {spec.series_id} missing columns: {', '.join(missing)}")
+    if not frame["series_key"].eq(spec.key).all() or not frame["series_id"].eq(spec.series_id).all():
+        raise ValueError(f"Cached FRED identity mismatch for {spec.series_id}")
+    frame["observation_date_utc"] = pd.to_datetime(frame["observation_date_utc"], utc=True, errors="raise")
+    frame["available_at_utc"] = pd.to_datetime(frame["available_at_utc"], utc=True, errors="raise")
+    manifest_path = series_manifest_path(spec, root)
+    old_meta: dict[str, Any] = {}
+    if manifest_path.exists():
+        old_meta = json.loads(manifest_path.read_text(encoding="utf-8"))
+    metadata = _series_metadata(
+        spec, frame,
+        url=FREDGRAPH_URL.format(series_id=spec.series_id),
+        payload_sha256=old_meta.get("payload_sha256"),
+        retrieved_at_utc=old_meta.get("retrieved_at_utc"),
+        source_mode="CACHE_FALLBACK",
+        attempts=0,
+        last_error=old_meta.get("last_refresh_error"),
+    )
+    return frame.sort_values("observation_date_utc").reset_index(drop=True), metadata
+
+
+def _persist_series_cache(spec: ContextSeries, root: Path, frame: pd.DataFrame,
+                          metadata: dict[str, Any]) -> None:
+    _atomic_parquet(series_cache_path(spec, root), frame)
+    _atomic_json(series_manifest_path(spec, root), metadata)
 
 
 def refresh_gold_macro_context(
     root: Path = ROOT,
     session: requests.Session | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Refresh all required series without sacrificing last-good provider data."""
     frames: list[pd.DataFrame] = []
     series_metadata: list[dict[str, Any]] = []
+    unavailable: list[str] = []
+
     for spec in CONTEXT_SERIES:
-        frame, metadata = fetch_fred_series(spec, session=session)
+        try:
+            frame, metadata = fetch_fred_series(spec, session=session)
+            _persist_series_cache(spec, root, frame, metadata)
+        except (RuntimeError, requests.RequestException) as exc:
+            try:
+                frame, metadata = _load_series_cache(spec, root)
+                metadata["last_refresh_error"] = f"{type(exc).__name__}: {exc}"
+                _atomic_json(series_manifest_path(spec, root), metadata)
+            except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError):
+                unavailable.append(f"{spec.series_id}: {type(exc).__name__}: {exc}")
+                continue
         frames.append(frame)
         series_metadata.append(metadata)
-    combined = pd.concat(frames, ignore_index=True).sort_values(["series_key", "available_at_utc"]).reset_index(drop=True)
+
+    if unavailable:
+        # Do not replace the last-good combined store with an incomplete refresh.
+        raise RuntimeError(
+            "Verified XAUUSD macro context refresh incomplete. Successful series were cached for resume. "
+            "Re-run when network access is stable, or use -Offline only after a complete context store exists. "
+            "Missing: " + " | ".join(unavailable)
+        )
+
+    combined = pd.concat(frames, ignore_index=True).sort_values(
+        ["series_key", "available_at_utc"]
+    ).reset_index(drop=True)
     manifest = {
         "contract_version": CONTRACT_VERSION,
         "provider_id": PROVIDER_ID,
         "generated_at_utc": pd.Timestamp.now(tz="UTC").isoformat(),
         "series": series_metadata,
         "row_count": len(combined),
+        "series_count": len(series_metadata),
+        "network_refresh_count": sum(m.get("source_mode") == "NETWORK_REFRESH" for m in series_metadata),
+        "cache_fallback_count": sum(m.get("source_mode") == "CACHE_FALLBACK" for m in series_metadata),
         "vintage_safe": False,
         "production_model_eligible": False,
         "automatic_execution": "DISABLED",
@@ -176,7 +300,9 @@ def refresh_gold_macro_context(
 def load_gold_macro_context(root: Path = ROOT) -> pd.DataFrame:
     path = context_store(root)
     if not path.exists():
-        raise FileNotFoundError(f"Missing verified XAUUSD context store: {path}")
+        raise FileNotFoundError(
+            f"Missing verified XAUUSD context store: {path}. Run an online V1.0B.3 refresh first."
+        )
     frame = pd.read_parquet(path)
     required = {"series_key", "series_id", "observation_date_utc", "available_at_utc", "value", "vintage_safe"}
     missing = sorted(required - set(frame.columns))
@@ -186,6 +312,11 @@ def load_gold_macro_context(root: Path = ROOT) -> pd.DataFrame:
     frame["available_at_utc"] = pd.to_datetime(frame["available_at_utc"], utc=True, errors="raise")
     if frame["available_at_utc"].isna().any():
         raise ValueError("Context availability timestamps are required")
+    present = set(frame["series_id"].astype(str))
+    required_series = {item.series_id for item in CONTEXT_SERIES}
+    missing_series = sorted(required_series - present)
+    if missing_series:
+        raise ValueError("Context store is incomplete; missing: " + ", ".join(missing_series))
     return frame.sort_values(["series_key", "available_at_utc"]).reset_index(drop=True)
 
 
