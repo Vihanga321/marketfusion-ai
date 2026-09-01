@@ -1,0 +1,15 @@
+{
+  "prediction_target": "XAUUSD",
+  "context_read_only": true,
+  "allowed_context_families": ["SILVER", "USDJPY", "EURUSD", "US500", "US100"],
+  "historical_join_clock": "RAW_MT5_BROKER_EPOCH_KEY",
+  "wall_clock_features_used": false,
+  "historical_dst_correction_invented": false,
+  "exact_completed_m5_join_only": true,
+  "forming_bar_excluded": true,
+  "model_promotion_performed": false,
+  "production_integration": false,
+  "automatic_execution": "DISABLED",
+  "runtime": "SHADOW_ADVISORY_ONLY",
+  "manual_confirmation": "REQUIRED"
+}
