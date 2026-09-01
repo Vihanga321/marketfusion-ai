@@ -1,0 +1,1 @@
+V1.0B.5 is research-only. Run scripts/run_v10b5_xauusd_intraday_intermarket_evidence.ps1 locally against the connected MetaQuotes-Demo terminal. XAUUSD remains the only prediction target; context instruments are read-only. No model promotion or production integration is performed.
