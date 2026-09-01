@@ -2,6 +2,8 @@
 
 ## Purpose
 
+V1.0B is now the merged baseline on `main`. Its real local XAUUSD experiment completed with no approved 15m/60m/240m champion, which is the expected fail-closed outcome when promotion evidence is insufficient.
+
 V1.0B completed successfully as a research phase, but no XAUUSD 15m/60m/240m candidate passed the full promotion gate. The strongest candidates also showed a repeated failure mode: the original three-class target produced a very small NEUTRAL class at longer horizons and many models effectively behaved like DOWN/UP classifiers while ignoring NEUTRAL.
 
 V1.0B.1 therefore does **not** add a bigger model. It first tests whether the prediction problem itself should be reformulated.
