@@ -16,6 +16,21 @@ try {
     & $Python scripts\repo_safety_check.py
     if ($LASTEXITCODE -ne 0) { throw 'Repository safety validation failed' }
 
+    # Avoid joblib/loky falling back to the removed WMIC utility on modern Windows.
+    # This only caps worker discovery; it does not change research/model logic.
+    try {
+        $PhysicalCores = @(
+            Get-CimInstance Win32_Processor -ErrorAction Stop |
+            ForEach-Object { [int]$_.NumberOfCores }
+        ) | Measure-Object -Sum
+        if ($PhysicalCores.Sum -and [int]$PhysicalCores.Sum -gt 0) {
+            $env:LOKY_MAX_CPU_COUNT = [string][int]$PhysicalCores.Sum
+            Write-Host "Research CPU worker ceiling: $($env:LOKY_MAX_CPU_COUNT) (Windows CIM physical cores)"
+        }
+    } catch {
+        Write-Host 'Research CPU worker ceiling: joblib default (CIM physical-core query unavailable)'
+    }
+
     Write-Host 'MarketFusion V1.0B.5 XAUUSD intraday intermarket evidence research'
     Write-Host 'Prediction target: XAUUSD ONLY.'
     Write-Host 'Verified MT5 context instruments are read-only sensors, never prediction targets.'
