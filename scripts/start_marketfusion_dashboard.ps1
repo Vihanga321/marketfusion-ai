@@ -163,20 +163,20 @@ try {
         else { $null = Start-MarketFusionProcess 'v06_runtime' $Python @('-m','src.runtime.v06c_runner','--continuous','--interval-seconds','15') 'src.runtime.v06c_runner' }
     }
     $ApiErrLog = Join-Path $LogRoot 'v07_api.err.log'
-    $ApiPid = Start-MarketFusionProcess 'v07_api' $Python @('-m','src.dashboard.v07_api','--host','127.0.0.1','--port','8765') 'src.dashboard.v07_api'
-    Wait-MarketFusionEndpoint 'v07_api' 'src.dashboard.v07_api' $ApiPid 8765 "http://127.0.0.1:8765/api/health?symbol=$Symbol" $ApiErrLog $DashboardUrl
-    Write-Host 'V07 API: PASS'
+    $ApiPid = Start-MarketFusionProcess 'v07_api' $Python @('-m','src.dashboard.full_api','--host','127.0.0.1','--port','8765') 'src.dashboard.full_api'
+    Wait-MarketFusionEndpoint 'v07_api' 'src.dashboard.full_api' $ApiPid 8765 "http://127.0.0.1:8765/api/health?symbol=$Symbol" $ApiErrLog $DashboardUrl
+    Write-Host 'MARKETFUSION FULL API: PASS'
     Write-Host "API PID: $ApiPid"
     Write-Host 'API port: 8765 LISTEN'
 
     $DashboardErrLog = Join-Path $LogRoot 'v07_dashboard.err.log'
     $DashboardPid = Start-MarketFusionProcess 'v07_dashboard' $Node @('dashboard/node_modules/vite/bin/vite.js','dashboard','--host','127.0.0.1','--port',[string]$DashboardPort,'--strictPort') 'vite/bin/vite.js'
     Wait-MarketFusionEndpoint 'v07_dashboard' 'vite/bin/vite.js' $DashboardPid $DashboardPort $DashboardUrl $DashboardErrLog
-    Write-Host 'V07 DASHBOARD: PASS'
+    Write-Host 'MARKETFUSION FULL DASHBOARD: PASS'
     Write-Host "Dashboard PID: $DashboardPid"
     Write-Host "Dashboard port: $DashboardPort LISTEN"
     Write-Host "Dashboard URL: $DashboardUrl"
-    Write-Host 'Trading execution remains disabled; manual execution in MT5 only.'
+    Write-Host 'Automatic execution remains DISABLED; runtime remains SHADOW_ADVISORY_ONLY.'
     if (-not $NoBrowser) { Start-Process $DashboardUrl }
 } finally {
     if ($HadDashboardPortEnvironment) { $env:MARKETFUSION_DASHBOARD_PORT = $PreviousDashboardPortEnvironment }
