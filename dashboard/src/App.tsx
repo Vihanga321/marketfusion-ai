@@ -26,6 +26,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Browser-only visualization bus. It never writes to model features,
+    // forward-validation ledgers, training data, or any causal runtime path.
     const snapshot = realtime.snapshot;
     const isLive = realtime.connection === "LIVE";
     window.dispatchEvent(new CustomEvent("marketfusion-live-quote", {
