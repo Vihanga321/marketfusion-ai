@@ -132,7 +132,18 @@ class V07DashboardApiTests(unittest.TestCase):
         response = self.client.get("/api/health", headers={"Origin": "http://127.0.0.1:5173"})
         self.assertNotIn("access-control-allow-origin", response.headers)
 
-    def test_21_operator_status_is_read_only_and_separates_health(self):
+    def test_21_websocket_uses_the_configured_dashboard_origins(self):
+        snapshot = {
+            "symbol": "XAUUSD", "sequence": 1, "connection": "LIVE", "freshness": "LIVE",
+            "received_at_utc": NOW.isoformat(), "bid": 1.0, "ask": 1.1, "mid": 1.05,
+        }
+        with patch("src.dashboard.v07_api.load_quote_snapshot", return_value=snapshot):
+            with self.client.websocket_connect(
+                "/ws/market/XAUUSD", headers={"origin": VITE_ORIGINS[0]},
+            ) as websocket:
+                self.assertEqual(websocket.receive_json()["sequence"], 1)
+
+    def test_22_operator_status_is_read_only_and_separates_health(self):
         temp, path = self._state_file(valid_state())
         with temp, TemporaryDirectory() as data_dir, \
                 patch("src.dashboard.v07_api.V06_STATE_FILE", path), \

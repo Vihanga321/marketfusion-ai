@@ -12,7 +12,9 @@ from threading import Lock
 from typing import Any
 
 from src.assets.contracts import normalize_asset_id
-from src.marketdata.realtime_quote import LATEST_QUOTE_FILE, RUNTIME_DIR
+from src.marketdata.realtime_quote import LATEST_QUOTE_FILE, RUNTIME_DIR, STALE_AFTER_SECONDS
+
+DISCONNECTED_AFTER_SECONDS = 10.0
 
 
 class LatestValueBuffer:
@@ -43,11 +45,46 @@ def _read_snapshot(path_text: str, modified_ns: int) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def load_quote_snapshot(path: Path | None = None, symbol: str = "EURUSD") -> dict[str, Any]:
+def _age_snapshot(snapshot: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
+    """Downgrade a persisted display quote when its source heartbeat stops advancing.
+
+    The collector writes latest-value JSON. A dead or wedged collector can leave a
+    last-good snapshot on disk, so freshness must be recomputed at read time rather
+    than trusting the persisted LIVE flag forever.
+    """
+    sent = datetime.now(timezone.utc) if now is None else now.astimezone(timezone.utc)
+    payload = deepcopy(snapshot)
+    try:
+        received = datetime.fromisoformat(str(snapshot["received_at_utc"]).replace("Z", "+00:00"))
+        if received.tzinfo is None:
+            received = received.replace(tzinfo=timezone.utc)
+        else:
+            received = received.astimezone(timezone.utc)
+        age_seconds = max(0.0, (sent - received).total_seconds())
+        payload["snapshot_age_ms"] = round(age_seconds * 1000.0, 3)
+    except (KeyError, TypeError, ValueError):
+        payload["snapshot_age_ms"] = None
+        payload["freshness"] = "UNAVAILABLE"
+        payload["connection"] = "DISCONNECTED"
+        return payload
+
+    existing_connection = str(payload.get("connection", "UNAVAILABLE")).upper()
+    if age_seconds > DISCONNECTED_AFTER_SECONDS:
+        payload["freshness"] = "STALE"
+        payload["connection"] = "DISCONNECTED"
+    elif age_seconds > STALE_AFTER_SECONDS:
+        payload["freshness"] = "STALE"
+        if existing_connection == "LIVE":
+            payload["connection"] = "STALE"
+    return payload
+
+
+def load_quote_snapshot(path: Path | None = None, symbol: str = "EURUSD", now: datetime | None = None) -> dict[str, Any]:
     asset = normalize_asset_id(symbol)
     path = (LATEST_QUOTE_FILE if asset == "EURUSD" else RUNTIME_DIR / f"{asset}_quote.json") if path is None else path
     try:
-        return deepcopy(_read_snapshot(str(path.resolve()), path.stat().st_mtime_ns))
+        snapshot = deepcopy(_read_snapshot(str(path.resolve()), path.stat().st_mtime_ns))
+        return _age_snapshot(snapshot, now)
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return {
             "contract_version": "realtime-quote-v1", "symbol": asset,
@@ -60,10 +97,14 @@ def load_quote_snapshot(path: Path | None = None, symbol: str = "EURUSD") -> dic
 
 def prepare_stream_payload(snapshot: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
     sent = datetime.now(timezone.utc) if now is None else now.astimezone(timezone.utc)
-    payload = deepcopy(snapshot)
+    payload = _age_snapshot(snapshot, sent)
     payload["api_sent_at_utc"] = sent.isoformat()
     try:
         received = datetime.fromisoformat(str(snapshot["received_at_utc"]).replace("Z", "+00:00"))
+        if received.tzinfo is None:
+            received = received.replace(tzinfo=timezone.utc)
+        else:
+            received = received.astimezone(timezone.utc)
         payload["feed_delivery_ms"] = round(max(0.0, (sent - received).total_seconds() * 1000), 3)
     except (KeyError, TypeError, ValueError):
         payload["feed_delivery_ms"] = None

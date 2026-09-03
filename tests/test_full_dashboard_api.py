@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -66,6 +67,61 @@ class FullDashboardApiTests(unittest.TestCase):
     def test_forward_status_not_configured_for_eurusd(self) -> None:
         response = self.client.get("/api/evaluation/forward/status?symbol=EURUSD")
         self.assertEqual(response.status_code, 404)
+
+    def test_reliability_endpoint_is_fail_closed_before_start(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            health = root / "collector_health.json"
+            outages = root / "outages.jsonl"
+            with patch("src.dashboard.full_api.RELIABILITY_HEALTH_FILE", health), patch("src.dashboard.full_api.RELIABILITY_OUTAGE_FILE", outages):
+                response = self.client.get("/api/system/reliability?symbol=XAUUSD")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "NOT_STARTED")
+        self.assertEqual(payload["safety"]["automatic_execution"], "DISABLED")
+        self.assertEqual(payload["safety"]["backfill"], "PROHIBITED")
+
+    def test_reliability_endpoint_returns_real_fresh_heartbeat_and_outages(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            health = root / "collector_health.json"
+            outages = root / "outages.jsonl"
+            health.write_text(json.dumps({
+                "contract_version": "v1.0c1-xauusd-reliability-supervisor-v1",
+                "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "collector": {"state": "RUNNING", "reconnects": 2},
+                "machine": {"disk_free_gb": 100.0},
+                "safety": {"automatic_execution": "DISABLED", "backfill": "PROHIBITED"},
+            }), encoding="utf-8")
+            outages.write_text(json.dumps({"error": "MT5 IPC", "recovered": True}) + "\n", encoding="utf-8")
+            with patch("src.dashboard.full_api.RELIABILITY_HEALTH_FILE", health), patch("src.dashboard.full_api.RELIABILITY_OUTAGE_FILE", outages):
+                response = self.client.get("/api/system/reliability?symbol=XAUUSD")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "PASS")
+        self.assertLess(payload["heartbeat_age_seconds"], 5)
+        self.assertEqual(payload["collector"]["reconnects"], 2)
+        self.assertEqual(len(payload["recent_outages"]), 1)
+
+    def test_reliability_endpoint_marks_stale_running_heartbeat(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            health = root / "collector_health.json"
+            outages = root / "outages.jsonl"
+            health.write_text(json.dumps({
+                "contract_version": "v1.0c1-xauusd-reliability-supervisor-v1",
+                "updated_at_utc": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(),
+                "collector": {"state": "RUNNING"},
+                "safety": {"automatic_execution": "DISABLED"},
+            }), encoding="utf-8")
+            with patch("src.dashboard.full_api.RELIABILITY_HEALTH_FILE", health), patch("src.dashboard.full_api.RELIABILITY_OUTAGE_FILE", outages):
+                response = self.client.get("/api/system/reliability?symbol=XAUUSD")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "STALE_HEARTBEAT")
+
+    def test_reliability_endpoint_is_get_only(self) -> None:
+        response = self.client.post("/api/system/reliability?symbol=XAUUSD")
+        self.assertEqual(response.status_code, 405)
 
 
 if __name__ == "__main__":

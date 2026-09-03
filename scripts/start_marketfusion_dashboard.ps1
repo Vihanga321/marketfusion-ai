@@ -158,7 +158,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repository safety validation failed' }
     New-Item -ItemType Directory -Force -Path $PidRoot, $LogRoot | Out-Null
     if (-not $SkipRuntime) {
-        if ($Symbol -eq 'XAUUSD') { $null = Start-MarketFusionProcess 'v10a_xauusd_state' $Python @('-m','src.runtime.v10a_asset_state','--symbol','XAUUSD','--continuous','--interval-seconds','15') 'src.runtime.v10a_asset_state' }
+        $QuoteName = "realtime_quote_$($Symbol.ToLowerInvariant())"
+        $QuotePid = Start-MarketFusionProcess $QuoteName $Python @('-m','src.marketdata.realtime_quote','--symbol',$Symbol,'--poll-ms','250') 'src.marketdata.realtime_quote'
+        Write-Host "MARKETFUSION REALTIME QUOTE: RUNNING (PID $QuotePid, 250ms poll, display-only)"
+        if ($Symbol -eq 'XAUUSD') {
+            $StatePid = Start-MarketFusionProcess 'v10a_xauusd_state' $Python @('-m','src.runtime.v10a_asset_state','--symbol','XAUUSD','--continuous','--interval-seconds','15') 'src.runtime.v10a_asset_state'
+            Write-Host "XAUUSD STATE: RUNNING (PID $StatePid)"
+        }
         elseif (Test-LegacyMarketFusionProcess 'v06_runtime' 'src.runtime.v06c_runner') { Write-Host 'v06_runtime already running from the V0.6 launcher; duplicate start skipped.' }
         else { $null = Start-MarketFusionProcess 'v06_runtime' $Python @('-m','src.runtime.v06c_runner','--continuous','--interval-seconds','15') 'src.runtime.v06c_runner' }
     }
@@ -176,6 +182,7 @@ try {
     Write-Host "Dashboard PID: $DashboardPid"
     Write-Host "Dashboard port: $DashboardPort LISTEN"
     Write-Host "Dashboard URL: $DashboardUrl"
+    Write-Host 'Live quote path is display-only; causal model inputs remain completed candles.'
     Write-Host 'Automatic execution remains DISABLED; runtime remains SHADOW_ADVISORY_ONLY.'
     if (-not $NoBrowser) { Start-Process $DashboardUrl }
 } finally {
