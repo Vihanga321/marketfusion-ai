@@ -25,6 +25,21 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const snapshot = realtime.snapshot;
+    const isLive = realtime.connection === "LIVE";
+    window.dispatchEvent(new CustomEvent("marketfusion-live-quote", {
+      detail: {
+        symbol: selectedAsset,
+        timeframe,
+        connection: realtime.connection,
+        mid: isLive ? snapshot?.mid ?? null : null,
+        sequence: snapshot?.sequence ?? null,
+        partialM1: isLive ? snapshot?.partial_m1 ?? null : null,
+      },
+    }));
+  }, [selectedAsset, timeframe, realtime.connection, realtime.snapshot]);
+
   const refresh = () => {
     supplementary.refresh();
     forward.refresh();
