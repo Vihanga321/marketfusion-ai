@@ -74,6 +74,9 @@ export function CandleChart({ candles, livePrice = null, live = false }: { candl
         return;
       }
 
+      // M5/M15/H1 forming bars are browser-only visual approximations seeded
+      // from the latest completed close and advanced by the live mid price.
+      // They never enter the causal completed-candle/model path.
       const time = bucketStart(detail.normalizedTickUtc, timeframe);
       if (!time) {
         setDisplayForming(null);
