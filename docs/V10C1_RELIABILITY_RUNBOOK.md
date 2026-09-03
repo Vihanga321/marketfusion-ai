@@ -53,6 +53,18 @@ Expected checks include:
 
 This preflight does not record predictions or outcomes.
 
+## Realtime dashboard feed
+
+For the operations dashboard, use:
+
+```powershell
+.\scripts\start_marketfusion_dashboard.ps1 -Symbol XAUUSD
+```
+
+The launcher starts a dedicated read-only MT5 quote collector at a 250 ms poll interval. The browser receives latest-value quote updates through the localhost WebSocket endpoint, with a 1-second REST fallback if the socket is temporarily unavailable. Completed-candle chart data is refreshed every 2 seconds so a newly closed bar appears promptly.
+
+The realtime quote path is display-only. It never becomes a model feature source, never changes a frozen forward prediction and never uses a forming candle in the causal V1.0C.1 model path.
+
 ## Monday: official clean forward start
 
 Only when the market is live and the final read-only preflight is PASS:
