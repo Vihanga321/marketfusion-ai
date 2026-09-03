@@ -3,7 +3,7 @@ import { fetchCandles } from "../api/client";
 import type { AssetId } from "../api/client";
 import type { Candle, Timeframe } from "../types/marketfusion";
 
-export function useCandles(timeframe: Timeframe, symbol: AssetId = "EURUSD", refreshMs = 20000) {
+export function useCandles(timeframe: Timeframe, symbol: AssetId = "EURUSD", refreshMs = 2000) {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [status, setStatus] = useState("LOADING");
   useEffect(() => {
