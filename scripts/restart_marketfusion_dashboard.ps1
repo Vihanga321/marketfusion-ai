@@ -53,12 +53,49 @@ function Stop-OwnedListener {
     }
 }
 
+function Stop-OwnedProcessRecord {
+    param(
+        [Parameter(Mandatory=$true)][string]$PidFile,
+        [Parameter(Mandatory=$true)][string]$AllowedPattern,
+        [Parameter(Mandatory=$true)][string]$Name
+    )
+    if (-not (Test-Path -LiteralPath $PidFile)) { return }
+    $Record = $null
+    try { $Record = Get-Content -Raw -LiteralPath $PidFile | ConvertFrom-Json } catch { $Record = $null }
+    if ($null -eq $Record -or $null -eq $Record.pid) {
+        Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+    $ProcessId = [int]$Record.pid
+    $Info = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    if ($null -eq $Info) {
+        Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+    $CommandLine = [string]$Info.CommandLine
+    if ($CommandLine -notmatch $AllowedPattern -or $CommandLine -notmatch $RootPattern) {
+        throw "$Name PID record points to a process that is not owned by this MarketFusion repository. PID $ProcessId. Command: $CommandLine"
+    }
+    Write-Host "Restarting $Name (PID $ProcessId)."
+    Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+    Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+}
+
 Push-Location $Root
 try {
     # Validate every required port before stopping anything, avoiding a partial
     # restart if another application owns either listener.
     Stop-OwnedListener -Port 8765 -AllowedPattern 'src\.dashboard\.(full_api|v07_api)' -ExpectedPidFile (Join-Path $PidRoot 'v07_api.json') -ValidateOnly
     Stop-OwnedListener -Port $DashboardPort -AllowedPattern '(vite.*dashboard|dashboard.*vite)' -ExpectedPidFile (Join-Path $PidRoot 'v07_dashboard.json') -ValidateOnly
+
+    if (-not $SkipRuntime) {
+        $QuotePidFile = Join-Path $PidRoot "realtime_quote_$($Symbol.ToLowerInvariant()).json"
+        Stop-OwnedProcessRecord -PidFile $QuotePidFile -AllowedPattern 'src\.marketdata\.realtime_quote' -Name "realtime quote $Symbol"
+        if ($Symbol -eq 'XAUUSD') {
+            Stop-OwnedProcessRecord -PidFile (Join-Path $PidRoot 'v10a_xauusd_state.json') -AllowedPattern 'src\.runtime\.v10a_asset_state' -Name 'XAUUSD state'
+        }
+    }
+
     Stop-OwnedListener -Port 8765 -AllowedPattern 'src\.dashboard\.(full_api|v07_api)' -ExpectedPidFile (Join-Path $PidRoot 'v07_api.json')
     Stop-OwnedListener -Port $DashboardPort -AllowedPattern '(vite.*dashboard|dashboard.*vite)' -ExpectedPidFile (Join-Path $PidRoot 'v07_dashboard.json')
 
