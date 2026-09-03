@@ -34,6 +34,19 @@ function bucketStart(timestamp: string | null | undefined, timeframe: string) {
   return new Date(Math.floor(parsed.getTime() / bucketMs) * bucketMs).toISOString();
 }
 
+function axisTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(parsed).replace(",", "");
+}
+
 export function CandleChart({ candles, livePrice = null, live = false }: { candles: Candle[]; livePrice?: number | null; live?: boolean }) {
   const [eventLivePrice, setEventLivePrice] = useState<number | null>(null);
   const [eventLive, setEventLive] = useState(false);
@@ -74,9 +87,6 @@ export function CandleChart({ candles, livePrice = null, live = false }: { candl
         return;
       }
 
-      // M5/M15/H1 forming bars are browser-only visual approximations seeded
-      // from the latest completed close and advanced by the live mid price.
-      // They never enter the causal completed-candle/model path.
       const time = bucketStart(detail.normalizedTickUtc, timeframe);
       if (!time) {
         setDisplayForming(null);
@@ -117,34 +127,118 @@ export function CandleChart({ candles, livePrice = null, live = false }: { candl
   const effectiveLivePrice = livePrice ?? eventLivePrice;
   const effectiveLive = live || eventLive;
   const eventPartial = displayForming?.candle ?? null;
-  const completed = candles.slice(eventPartial ? -89 : -90);
+  const completed = candles.slice(eventPartial ? -109 : -110);
   const visible = eventPartial && !completed.some((candle) => candle.time === eventPartial.time)
     ? [...completed, eventPartial]
     : completed;
+
   if (!visible.length) return <div className="chart-empty">MARKET DATA UNAVAILABLE</div>;
-  const width = 960, height = 330, pad = 18;
-  const highs = visible.map(c => c.high); const lows = visible.map(c => c.low);
-  if (effectiveLivePrice != null && Number.isFinite(effectiveLivePrice)) { highs.push(effectiveLivePrice); lows.push(effectiveLivePrice); }
-  const high = Math.max(...highs); const low = Math.min(...lows);
-  const range = Math.max(high - low, 0.00001); const step = (width - pad * 2) / visible.length;
-  const y = (value: number) => pad + ((high - value) / range) * (height - pad * 2);
+
+  // MT5-like geometry while preserving MarketFusion's existing green/red colors.
+  const width = 960;
+  const height = 360;
+  const leftPad = 12;
+  const rightPad = 72;
+  const topPad = 12;
+  const bottomPad = 28;
+  const volumeHeight = 48;
+  const volumeGap = 8;
+  const priceBottom = height - bottomPad - volumeHeight - volumeGap;
+  const plotWidth = width - leftPad - rightPad;
+  const plotHeight = priceBottom - topPad;
+
+  const highs = visible.map((c) => c.high);
+  const lows = visible.map((c) => c.low);
+  if (effectiveLivePrice != null && Number.isFinite(effectiveLivePrice)) {
+    highs.push(effectiveLivePrice);
+    lows.push(effectiveLivePrice);
+  }
+  const rawHigh = Math.max(...highs);
+  const rawLow = Math.min(...lows);
+  const rawRange = Math.max(rawHigh - rawLow, 0.00001);
+  const high = rawHigh + rawRange * 0.035;
+  const low = rawLow - rawRange * 0.035;
+  const range = Math.max(high - low, 0.00001);
+  const step = plotWidth / visible.length;
+  const y = (value: number) => topPad + ((high - value) / range) * plotHeight;
   const digits = high > 100 ? 2 : 5;
-  return <svg className="candle-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Completed causal candles with a display-only realtime forming candle and live price overlay">
-    <defs><pattern id="grid" width="80" height="55" patternUnits="userSpaceOnUse"><path d="M 80 0 L 0 0 0 55" fill="none" stroke="#17304a" strokeWidth="1" /></pattern></defs>
-    <rect width={width} height={height} fill="url(#grid)" />
+
+  const volumes = visible.map((c) => typeof c.volume === "number" && Number.isFinite(c.volume) ? Math.max(0, c.volume) : 0);
+  const maxVolume = Math.max(...volumes, 0);
+  const volumeTop = priceBottom + volumeGap;
+  const volumeBottom = height - bottomPad;
+  const volumeY = (value: number) => maxVolume > 0
+    ? volumeBottom - (value / maxVolume) * volumeHeight
+    : volumeBottom;
+
+  const horizontalTicks = 6;
+  const timeTickIndexes = Array.from(new Set([0, Math.floor((visible.length - 1) * 0.25), Math.floor((visible.length - 1) * 0.5), Math.floor((visible.length - 1) * 0.75), visible.length - 1]));
+
+  return <svg className="candle-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="MT5-style MarketFusion chart with completed causal candles and a display-only realtime forming candle">
+    <rect x="0" y="0" width={width} height={height} fill="#071521" />
+
+    {/* MT5-style dashed grid */}
+    {Array.from({ length: horizontalTicks + 1 }, (_, index) => {
+      const gy = topPad + (plotHeight / horizontalTicks) * index;
+      return <line key={`h-${index}`} x1={leftPad} x2={width - rightPad} y1={gy} y2={gy} stroke="#17304a" strokeWidth="1" strokeDasharray="3 4" />;
+    })}
+    {Array.from({ length: 12 }, (_, index) => {
+      const gx = leftPad + (plotWidth / 11) * index;
+      return <line key={`v-${index}`} x1={gx} x2={gx} y1={topPad} y2={volumeBottom} stroke="#17304a" strokeWidth="1" strokeDasharray="3 4" />;
+    })}
+
+    {/* Candles: same MarketFusion colors, slimmer MT5-like bodies/wicks */}
     {visible.map((candle, index) => {
       const isPartial = eventPartial?.time === candle.time;
-      const x = pad + index * step + step / 2; const up = candle.close >= candle.open; const color = up ? "#20c997" : "#f0657a";
-      const bodyTop = y(Math.max(candle.open, candle.close)); const bodyHeight = Math.max(1.5, Math.abs(y(candle.open) - y(candle.close)));
-      return <g key={`${candle.time}-${isPartial ? "live" : "closed"}`} aria-label={isPartial ? `Display-only forming ${displayForming?.timeframe ?? ""} candle` : "Completed candle"}><line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} stroke={color} strokeWidth={isPartial ? "1.6" : "1"} /><rect x={x - Math.max(1, step * .28)} y={bodyTop} width={Math.max(2, step * .56)} height={bodyHeight} fill={color} rx=".5" opacity={isPartial ? "0.92" : "1"} />{isPartial && <circle cx={x} cy={y(candle.close)} r="2.5" fill="#8ee8ff" />}</g>;
+      const x = leftPad + index * step + step / 2;
+      const up = candle.close >= candle.open;
+      const color = up ? "#20c997" : "#f0657a";
+      const bodyTop = y(Math.max(candle.open, candle.close));
+      const bodyHeight = Math.max(1.1, Math.abs(y(candle.open) - y(candle.close)));
+      const bodyWidth = Math.max(1.4, Math.min(5.2, step * 0.48));
+      return <g key={`${candle.time}-${isPartial ? "live" : "closed"}`} aria-label={isPartial ? `Display-only forming ${displayForming?.timeframe ?? ""} candle` : "Completed candle"}>
+        <line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} stroke={color} strokeWidth={isPartial ? "1.35" : "1"} />
+        <rect x={x - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} fill={color} stroke={color} strokeWidth="0.7" />
+      </g>;
     })}
+
+    {/* Actual volume only; no fabricated bars when volume is unavailable. */}
+    {maxVolume > 0 && visible.map((candle, index) => {
+      const value = volumes[index];
+      if (value <= 0) return null;
+      const x = leftPad + index * step + step / 2;
+      const up = candle.close >= candle.open;
+      const color = up ? "#20c997" : "#f0657a";
+      const barWidth = Math.max(1, Math.min(3.2, step * 0.32));
+      const vy = volumeY(value);
+      return <rect key={`vol-${candle.time}`} x={x - barWidth / 2} y={vy} width={barWidth} height={Math.max(1, volumeBottom - vy)} fill={color} opacity="0.75" />;
+    })}
+
+    {/* Right-side price scale, closer to MT5. */}
+    {Array.from({ length: horizontalTicks + 1 }, (_, index) => {
+      const price = high - (range / horizontalTicks) * index;
+      const gy = topPad + (plotHeight / horizontalTicks) * index;
+      return <text key={`p-${index}`} x={width - rightPad + 7} y={gy + 4} fill="#7f94aa" fontSize="11">{price.toFixed(digits)}</text>;
+    })}
+
+    {/* Bottom date/time scale. */}
+    {timeTickIndexes.map((index) => {
+      const candle = visible[index];
+      if (!candle) return null;
+      const x = leftPad + index * step + step / 2;
+      const anchor = index === 0 ? "start" : index === visible.length - 1 ? "end" : "middle";
+      const labelX = index === 0 ? leftPad : index === visible.length - 1 ? width - rightPad : x;
+      return <text key={`t-${candle.time}`} x={labelX} y={height - 8} textAnchor={anchor} fill="#7f94aa" fontSize="10">{axisTime(candle.time)}</text>;
+    })}
+
+    {/* Display-only live price line. */}
     {effectiveLivePrice != null && Number.isFinite(effectiveLivePrice) && <g aria-label={effectiveLive ? "Live display price" : "Stale display price"}>
-      <line x1={pad} x2={width - pad} y1={y(effectiveLivePrice)} y2={y(effectiveLivePrice)} stroke={effectiveLive ? "#4dd7ff" : "#f0b44d"} strokeWidth="1.2" strokeDasharray="5 4" opacity="0.9" />
-      <circle cx={width - pad - 2} cy={y(effectiveLivePrice)} r="4" fill={effectiveLive ? "#4dd7ff" : "#f0b44d"} />
-      <rect x={width - 112} y={Math.max(4, y(effectiveLivePrice) - 14)} width="104" height="22" rx="4" fill="#071521" opacity="0.94" />
-      <text x={width - 14} y={Math.max(18, y(effectiveLivePrice) + 2)} textAnchor="end" fill={effectiveLive ? "#8ee8ff" : "#ffd37a"} fontSize="11">{effectiveLive ? "LIVE" : "STALE"} {effectiveLivePrice.toFixed(digits)}</text>
+      <line x1={leftPad} x2={width - rightPad} y1={y(effectiveLivePrice)} y2={y(effectiveLivePrice)} stroke={effectiveLive ? "#4dd7ff" : "#f0b44d"} strokeWidth="1" strokeDasharray="5 4" opacity="0.9" />
+      <rect x={width - rightPad + 2} y={Math.max(2, y(effectiveLivePrice) - 10)} width={rightPad - 5} height="20" rx="2" fill="#10263a" />
+      <text x={width - 5} y={Math.max(15, y(effectiveLivePrice) + 4)} textAnchor="end" fill={effectiveLive ? "#8ee8ff" : "#ffd37a"} fontSize="11">{effectiveLivePrice.toFixed(digits)}</text>
     </g>}
-    <text x={width - 10} y={18} textAnchor="end" fill="#7f94aa" fontSize="12">{high.toFixed(digits)}</text>
-    <text x={width - 10} y={height - 8} textAnchor="end" fill="#7f94aa" fontSize="12">{low.toFixed(digits)}</text>
+
+    <line x1={width - rightPad} x2={width - rightPad} y1={topPad} y2={volumeBottom} stroke="#29455f" strokeWidth="1" />
+    <line x1={leftPad} x2={width - rightPad} y1={volumeBottom} y2={volumeBottom} stroke="#29455f" strokeWidth="1" />
   </svg>;
 }
