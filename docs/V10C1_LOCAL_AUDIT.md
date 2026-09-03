@@ -17,6 +17,8 @@ Verified locally:
 - localhost API endpoints and full frontend build/tests
 - V1.0C.1 reliability preflight in uninitialized state
 - prior V1.0C forward state archived without creating new observations
+- MarketFusion chart geometry refined toward an MT5-style presentation with denser candles, dashed grid, right-side price scale, bottom date/time labels, and actual volume bars when available
+- existing MarketFusion candle/live colors preserved; no trading/order lines added
 
 Safety state remains:
 
