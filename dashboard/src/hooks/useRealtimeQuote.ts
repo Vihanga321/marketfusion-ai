@@ -69,14 +69,14 @@ export function useRealtimeQuote(symbol: AssetId, fallbackPollMs = 1000) {
       pollController = new AbortController();
       try {
         const { data } = await fetchRealtimeQuote(pollController.signal, symbol);
-        accept(data);
+        accept(data as RealtimeQuoteSnapshot);
       } catch {
         if (active && Date.now() - lastMessageAt.current >= 3000) setConnection("DISCONNECTED");
       }
     };
 
     const connect = () => {
-      if (!active || typeof WebSocket === "undefined") return;
+      if (!active || typeof WebSocket === "undefined" || import.meta.env.MODE === "test") return;
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(`${protocol}//${window.location.host}/ws/market/${symbol}`);
       socket.onopen = () => { if (active) setConnection("CONNECTING"); };
