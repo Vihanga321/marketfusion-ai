@@ -27,6 +27,7 @@ MAX_POLL_SECONDS = 1.00
 MAX_CLOCK_ERROR_SECONDS = 5.0
 MAX_BROKER_OFFSET_HOURS = 14
 STALE_AFTER_SECONDS = 3.0
+RECONNECT_DELAY_SECONDS = 1.0
 TELEMETRY_WINDOW = 512
 
 
@@ -193,6 +194,34 @@ class RealtimeQuoteCollector:
         return payload
 
 
+def _connect_mt5(mt5: Any, collector: RealtimeQuoteCollector) -> float:
+    """Reconnect the display-only MT5 session and return point size."""
+    try:
+        mt5.shutdown()
+    except Exception:
+        pass
+    if not mt5.initialize():
+        raise RuntimeError(f"mt5.initialize() failed: {mt5.last_error()}")
+    if not mt5.symbol_select(collector.symbol, True):
+        raise RuntimeError(f"mt5.symbol_select({collector.symbol!r}, True) failed: {mt5.last_error()}")
+    info = mt5.symbol_info(collector.symbol)
+    if info is None or float(info.point) <= 0:
+        raise RuntimeError(f"Could not read symbol info for {collector.symbol}")
+    return float(info.point)
+
+
+def _degraded_payload(collector: RealtimeQuoteCollector, exc: Exception) -> dict[str, object]:
+    return {
+        "contract_version": "realtime-quote-v1", "symbol": collector.symbol,
+        "connection": "DEGRADED", "freshness": "UNAVAILABLE",
+        "received_at_utc": _iso(utc_now()), "normalized_tick_utc": None,
+        "bid": None, "ask": None, "mid": None, "spread_points": None,
+        "error": f"{type(exc).__name__}: {exc}",
+        "sequence": collector.sequence, "performance": collector.telemetry.snapshot(),
+        "trading_enabled": False,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--poll-ms", type=int, default=250)
@@ -203,33 +232,33 @@ def main() -> int:
         import MetaTrader5 as mt5  # type: ignore
     except ImportError as exc:
         raise SystemExit(f"MetaTrader5 unavailable: {exc}")
-    if not mt5.initialize():
-        raise SystemExit(f"mt5.initialize() failed: {mt5.last_error()}")
+
+    point_size: float | None = None
+    next_poll = time.monotonic()
     try:
-        if not mt5.symbol_select(collector.symbol, True):
-            raise RuntimeError(f"mt5.symbol_select({collector.symbol!r}, True) failed: {mt5.last_error()}")
-        info = mt5.symbol_info(collector.symbol)
-        if info is None or float(info.point) <= 0:
-            raise RuntimeError(f"Could not read symbol info for {collector.symbol}")
-        point_size = float(info.point)
-        next_poll = time.monotonic()
         while True:
             try:
+                if point_size is None:
+                    point_size = _connect_mt5(mt5, collector)
                 collector.collect(mt5, point_size)
             except (RuntimeError, ValueError, OSError) as exc:
-                atomic_write_json({
-                    "contract_version": "realtime-quote-v1", "symbol": collector.symbol,
-                    "connection": "DEGRADED", "freshness": "UNAVAILABLE",
-                    "received_at_utc": _iso(utc_now()), "error": f"{type(exc).__name__}: {exc}",
-                    "sequence": collector.sequence, "performance": collector.telemetry.snapshot(),
-                    "trading_enabled": False,
-                }, collector.output_path)
+                atomic_write_json(_degraded_payload(collector, exc), collector.output_path)
+                try:
+                    mt5.shutdown()
+                except Exception:
+                    pass
+                point_size = None
+                time.sleep(RECONNECT_DELAY_SECONDS)
+                next_poll = time.monotonic()
             next_poll += collector.poll_seconds
             time.sleep(max(0.0, next_poll - time.monotonic()))
     except KeyboardInterrupt:
         return 0
     finally:
-        mt5.shutdown()
+        try:
+            mt5.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
