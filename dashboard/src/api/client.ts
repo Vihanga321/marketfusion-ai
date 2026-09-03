@@ -12,6 +12,7 @@ const assetPath = (path: string, symbol: AssetId) => symbol === "EURUSD" ? path 
 export const fetchState = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<MarketFusionState>(assetPath("/api/state", symbol), signal);
 export const fetchCandles = (timeframe: Timeframe, signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<CandleResponse>(assetPath(`/api/market/candles?timeframe=${timeframe}&limit=300`, symbol), signal);
 export const fetchMarketSummary = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<MarketSummary>(assetPath("/api/market/summary", symbol), signal);
+export const fetchRealtimeQuote = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<any>(assetPath("/api/market/quote", symbol), signal);
 export const fetchOperatorStatus = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<OperatorStatus>(assetPath("/api/operator/status", symbol), signal);
 export const fetchIntelligence = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<IntelligenceDetail>(assetPath("/api/intelligence", symbol), signal);
 export const fetchResearch = (signal?: AbortSignal, symbol: AssetId = "EURUSD") => getJson<ResearchState>(assetPath("/api/research", symbol), signal);
