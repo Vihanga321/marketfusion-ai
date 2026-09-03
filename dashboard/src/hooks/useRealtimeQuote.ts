@@ -33,17 +33,17 @@ export interface RealtimeQuoteSnapshot {
   partial_m1?: RealtimePartialCandle | null;
 }
 
-function asSummary(snapshot: RealtimeQuoteSnapshot): MarketSummary | null {
+function asSummary(snapshot: RealtimeQuoteSnapshot): MarketSummary {
   const connection = String(snapshot.connection ?? "UNAVAILABLE").toUpperCase();
   const freshness = String(snapshot.freshness ?? "UNAVAILABLE").toUpperCase();
   const live = connection === "LIVE" && freshness === "LIVE";
   return {
     status: live ? "PASS_LIVE" : connection || freshness,
     captured_at_utc: snapshot.received_at_utc ?? null,
-    bid: snapshot.bid ?? null,
-    ask: snapshot.ask ?? null,
-    mid: snapshot.mid ?? null,
-    spread_points: snapshot.spread_points ?? null,
+    bid: live ? snapshot.bid ?? null : null,
+    ask: live ? snapshot.ask ?? null : null,
+    mid: live ? snapshot.mid ?? null : null,
+    spread_points: live ? snapshot.spread_points ?? null : null,
   };
 }
 
