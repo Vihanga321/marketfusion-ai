@@ -3,6 +3,7 @@ import { FullDashboardShell } from "./components/FullDashboardShell";
 import { useCandles } from "./hooks/useCandles";
 import { useForwardValidation } from "./hooks/useForwardValidation";
 import { useMarketFusionState } from "./hooks/useMarketFusionState";
+import { useRealtimeQuote } from "./hooks/useRealtimeQuote";
 import { useSupplementary } from "./hooks/useSupplementary";
 import type { Timeframe } from "./types/marketfusion";
 import type { AssetId } from "./api/client";
@@ -12,6 +13,7 @@ export default function App() {
   const configured = (import.meta.env.VITE_MARKETFUSION_SYMBOL === "XAUUSD" ? "XAUUSD" : "EURUSD") as AssetId;
   const [selectedAsset, setSelectedAsset] = useState<AssetId>(configured);
   const { state, connection, lastSuccess } = useMarketFusionState(selectedAsset);
+  const realtime = useRealtimeQuote(selectedAsset);
   const [timeframe, setTimeframe] = useState<Timeframe>("M5");
   const { candles, status: candleStatus } = useCandles(timeframe, selectedAsset);
   const supplementary = useSupplementary(selectedAsset);
@@ -36,7 +38,7 @@ export default function App() {
       connection={connection}
       lastSuccess={lastSuccess}
       operator={supplementary.operator}
-      quote={supplementary.market}
+      quote={realtime.quote ?? supplementary.market}
       intelligence={supplementary.intelligence}
       research={supplementary.research}
       events={supplementary.events}
