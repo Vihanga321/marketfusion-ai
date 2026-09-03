@@ -14,7 +14,10 @@ export default defineConfig(({ mode }) => {
       host: "127.0.0.1",
       port: dashboardPort,
       strictPort: true,
-      proxy: { "/api": "http://127.0.0.1:8765" }
+      proxy: {
+        "/api": "http://127.0.0.1:8765",
+        "/ws": { target: "ws://127.0.0.1:8765", ws: true }
+      }
     },
     preview: { host: "127.0.0.1", port: dashboardPort, strictPort: true },
     test: {
