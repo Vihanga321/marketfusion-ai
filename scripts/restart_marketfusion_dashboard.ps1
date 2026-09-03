@@ -18,15 +18,15 @@ function Stop-OwnedListener {
 
     $Listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
     foreach ($Listener in $Listeners) {
-        $Pid = [int]$Listener.OwningProcess
-        $Info = Get-CimInstance Win32_Process -Filter "ProcessId = $Pid" -ErrorAction SilentlyContinue
+        $OwnerProcessId = [int]$Listener.OwningProcess
+        $Info = Get-CimInstance Win32_Process -Filter "ProcessId = $OwnerProcessId" -ErrorAction SilentlyContinue
         if ($null -eq $Info) { continue }
         $CommandLine = [string]$Info.CommandLine
         if ($CommandLine -notmatch $AllowedPattern) {
-            throw "TCP port $Port is already owned by non-MarketFusion PID $Pid. Command: $CommandLine"
+            throw "TCP port $Port is already owned by non-MarketFusion PID $OwnerProcessId. Command: $CommandLine"
         }
-        Write-Host "Stopping stale MarketFusion listener on port $Port (PID $Pid)."
-        Stop-Process -Id $Pid -Force -ErrorAction Stop
+        Write-Host "Stopping stale MarketFusion listener on port $Port (PID $OwnerProcessId)."
+        Stop-Process -Id $OwnerProcessId -Force -ErrorAction Stop
     }
 }
 
