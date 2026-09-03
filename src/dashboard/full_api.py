@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ from src.dashboard.v07_api import app
 
 RELIABILITY_HEALTH_FILE = ROOT / "data" / "runtime" / "v10c1" / "collector_health.json"
 RELIABILITY_OUTAGE_FILE = ROOT / "data" / "runtime" / "v10c1" / "provider_outages.jsonl"
+RELIABILITY_HEARTBEAT_STALE_SECONDS = 180
 
 
 def _read_object(path: Path) -> dict[str, Any] | None:
@@ -49,6 +51,18 @@ def _recent_jsonl(path: Path, limit: int = 20) -> list[dict[str, Any]]:
     return items
 
 
+def _heartbeat_age_seconds(value: object) -> float | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)).total_seconds())
+
+
 @app.get("/api/evaluation/forward/status")
 def forward_validation_status(symbol: str = Query("XAUUSD")) -> dict[str, Any]:
     """Return the newest explicit XAUUSD frozen-forward status without mutating it."""
@@ -82,6 +96,7 @@ def reliability_status(symbol: str = Query("XAUUSD")) -> dict[str, Any]:
             "contract_version": "v1.0c1-xauusd-reliability-supervisor-v1",
             "status": "NOT_STARTED",
             "collector": {"state": "NOT_STARTED"},
+            "heartbeat_age_seconds": None,
             "recent_outages": _recent_jsonl(RELIABILITY_OUTAGE_FILE),
             "safety": {
                 "automatic_execution": "DISABLED",
@@ -92,9 +107,13 @@ def reliability_status(symbol: str = Query("XAUUSD")) -> dict[str, Any]:
         }
     collector = health.get("collector") if isinstance(health.get("collector"), dict) else {}
     state = str(collector.get("state", "UNKNOWN"))
+    heartbeat_age = _heartbeat_age_seconds(health.get("updated_at_utc"))
+    stale = heartbeat_age is None or heartbeat_age > RELIABILITY_HEARTBEAT_STALE_SECONDS
+    api_status = "STALE_HEARTBEAT" if state == "RUNNING" and stale else ("PASS" if state == "RUNNING" else state)
     return {
         **health,
-        "status": "PASS" if state == "RUNNING" else state,
+        "status": api_status,
+        "heartbeat_age_seconds": heartbeat_age,
         "recent_outages": _recent_jsonl(RELIABILITY_OUTAGE_FILE),
     }
 
