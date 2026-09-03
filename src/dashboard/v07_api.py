@@ -221,7 +221,7 @@ async def market_stream(websocket: WebSocket, symbol: str) -> None:
         await websocket.close(code=1008)
         return
     origin = websocket.headers.get("origin")
-    allowed = {None, "http://127.0.0.1:4173", "http://localhost:4173"}
+    allowed = {None, *VITE_ORIGINS}
     if origin not in allowed:
         await websocket.close(code=1008)
         return
