@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-if (-not $IsWindows) { throw 'This startup-task installer is supported on Windows only.' }
+$RunningOnWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+if (-not $RunningOnWindows) { throw 'This startup-task installer is supported on Windows only.' }
 if (-not $ConfirmInstall) { throw 'Use -ConfirmInstall to create the Windows logon recovery task.' }
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
