@@ -8,8 +8,11 @@ from typing import Any
 
 from fastapi import HTTPException, Query
 
-from src.assets.contracts import asset_paths, normalize_asset_id
+from src.assets.contracts import ROOT, asset_paths, normalize_asset_id
 from src.dashboard.v07_api import app
+
+RELIABILITY_HEALTH_FILE = ROOT / "data" / "runtime" / "v10c1" / "collector_health.json"
+RELIABILITY_OUTAGE_FILE = ROOT / "data" / "runtime" / "v10c1" / "provider_outages.jsonl"
 
 
 def _read_object(path: Path) -> dict[str, Any] | None:
@@ -26,6 +29,24 @@ def _forward_status_candidates(asset: str) -> list[Path]:
         paths.evaluation / "v10c1_forward_validation" / "latest_status.json",
         paths.evaluation / "v10c_forward_validation" / "latest_status.json",
     ]
+
+
+def _recent_jsonl(path: Path, limit: int = 20) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()[-limit:]
+    except OSError:
+        return []
+    items: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            items.append(payload)
+    return items
 
 
 @app.get("/api/evaluation/forward/status")
@@ -47,6 +68,35 @@ def forward_validation_status(symbol: str = Query("XAUUSD")) -> dict[str, Any]:
         return payload
 
     raise HTTPException(status_code=404, detail="Forward validation status is not available")
+
+
+@app.get("/api/system/reliability")
+def reliability_status(symbol: str = Query("XAUUSD")) -> dict[str, Any]:
+    """Read the V1.0C.1 supervisor heartbeat and recent outage ledger."""
+    asset = normalize_asset_id(symbol)
+    if asset != "XAUUSD":
+        raise HTTPException(status_code=404, detail="Reliability supervisor is not configured for this asset")
+    health = _read_object(RELIABILITY_HEALTH_FILE)
+    if health is None:
+        return {
+            "contract_version": "v1.0c1-xauusd-reliability-supervisor-v1",
+            "status": "NOT_STARTED",
+            "collector": {"state": "NOT_STARTED"},
+            "recent_outages": _recent_jsonl(RELIABILITY_OUTAGE_FILE),
+            "safety": {
+                "automatic_execution": "DISABLED",
+                "runtime": "SHADOW_ADVISORY_ONLY",
+                "manual_confirmation": "REQUIRED",
+                "backfill": "PROHIBITED",
+            },
+        }
+    collector = health.get("collector") if isinstance(health.get("collector"), dict) else {}
+    state = str(collector.get("state", "UNKNOWN"))
+    return {
+        **health,
+        "status": "PASS" if state == "RUNNING" else state,
+        "recent_outages": _recent_jsonl(RELIABILITY_OUTAGE_FILE),
+    }
 
 
 def main() -> None:
