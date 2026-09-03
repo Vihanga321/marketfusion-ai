@@ -35,6 +35,7 @@ export default function App() {
         connection: realtime.connection,
         mid: isLive ? snapshot?.mid ?? null : null,
         sequence: snapshot?.sequence ?? null,
+        normalizedTickUtc: isLive ? snapshot?.normalized_tick_utc ?? null : null,
         partialM1: isLive ? snapshot?.partial_m1 ?? null : null,
       },
     }));
