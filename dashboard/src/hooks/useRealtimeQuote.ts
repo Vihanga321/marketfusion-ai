@@ -1,9 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchRealtimeQuote } from "../api/client";
 import type { AssetId } from "../api/client";
-import type { MarketSummary, RealtimeQuoteSnapshot } from "../types/marketfusion";
+import type { MarketSummary } from "../types/marketfusion";
 
 export type RealtimeQuoteConnection = "CONNECTING" | "LIVE" | "STALE" | "DISCONNECTED";
+
+export interface RealtimeQuoteSnapshot {
+  connection?: string;
+  freshness?: string;
+  received_at_utc?: string | null;
+  normalized_tick_utc?: string | null;
+  bid?: number | null;
+  ask?: number | null;
+  mid?: number | null;
+  spread_points?: number | null;
+  sequence?: number;
+  poll_interval_ms?: number | null;
+  feed_delivery_ms?: number | null;
+}
 
 function asSummary(snapshot: RealtimeQuoteSnapshot): MarketSummary | null {
   if (snapshot.bid == null || snapshot.ask == null || snapshot.mid == null) return null;
@@ -50,7 +64,7 @@ export function useRealtimeQuote(symbol: AssetId, fallbackPollMs = 1000) {
 
     const pollFallback = async () => {
       if (!active) return;
-      if (socket?.readyState === WebSocket.OPEN && Date.now() - lastMessageAt.current < 2500) return;
+      if (typeof WebSocket !== "undefined" && socket?.readyState === WebSocket.OPEN && Date.now() - lastMessageAt.current < 2500) return;
       pollController?.abort();
       pollController = new AbortController();
       try {
