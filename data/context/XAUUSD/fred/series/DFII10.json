@@ -1,0 +1,21 @@
+{
+  "attempts": 1,
+  "availability_policy": "observation_date + 4 calendar days + 23:59 UTC",
+  "description": "10-Year Inflation-Indexed U.S. Treasury Yield",
+  "first_observation": "2003-01-02T00:00:00+00:00",
+  "key": "real_yield_10y",
+  "last_observation": "2026-08-28T00:00:00+00:00",
+  "payload_sha256": "64e87d044de96784d42c48182ba24efd5e164e14e64b6a2fc36e80fd55e24423",
+  "production_model_eligible": false,
+  "provider_id": "FEDERAL_RESERVE_BOARD_OFFICIAL",
+  "provider_url": "https://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=0b98a66d3ff5e1ea0fbf88adc59b387f&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn&type=package",
+  "research_only": true,
+  "retrieved_at_utc": "2026-09-01T13:57:52.151055+00:00",
+  "rows": 5919,
+  "series_id": "DFII10",
+  "source": "Board of Governors of the Federal Reserve System via FRED",
+  "source_mode": "h15_ddp_csv",
+  "source_series_id": "H15/H15/RIFLGFCY10_XII_N.B",
+  "units": "percent",
+  "vintage_safe": false
+}

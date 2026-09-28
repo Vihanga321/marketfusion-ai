@@ -1,0 +1,21 @@
+{
+  "attempts": 1,
+  "availability_policy": "observation_date + 4 calendar days + 23:59 UTC",
+  "description": "Nominal Broad U.S. Dollar Index",
+  "first_observation": "2006-01-02T00:00:00+00:00",
+  "key": "usd_broad",
+  "last_observation": "2026-08-28T00:00:00+00:00",
+  "payload_sha256": "15ae9ebf1d19c0eafd9d9ea6178d9cfa7e73361e26565d728a51a4116a22cfcc",
+  "production_model_eligible": false,
+  "provider_id": "FEDERAL_RESERVE_BOARD_OFFICIAL",
+  "provider_url": "https://www.federalreserve.gov/releases/h10/summary/jrxwtfb_nb.htm",
+  "research_only": true,
+  "retrieved_at_utc": "2026-09-01T13:57:21.464160+00:00",
+  "rows": 5179,
+  "series_id": "DTWEXBGS",
+  "source": "Board of Governors of the Federal Reserve System via FRED",
+  "source_mode": "h10_summary",
+  "source_series_id": "H10/H10/JRXWTFB_N.B",
+  "units": "index",
+  "vintage_safe": false
+}
